@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Lernblock</title>
+<title>Kognit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -2355,6 +2355,11 @@ function renderList(){
     ${orphans.length ? `<section style="--fach:#8E8E93;--fach-rgb:142,142,147"><h2 class="group-title">Ohne Fach</h2><div class="glass list">${orphans.map(kaRow).join('')}</div></section>` : ''}
     <section><h2 class="group-title">Neues Fach</h2>
       <div class="glass list"><div class="row field"><input id="newfach" type="text" placeholder="z. B. Deutsch, WiSo, LF3" maxlength="60" aria-label="Name des neuen Fachs"><button class="btn small" data-addfach>Hinzufügen</button></div></div></section>
+    ${!(window.claude && window.claude.use) ? `<section><h2 class="group-title">Sicherung</h2>
+      <div class="glass list"><button class="row add" data-backup><span class="add-ic">↓</span><span class="row-title">Sicherung speichern</span></button>
+        <button class="row add" data-restorebtn><span class="add-ic">↑</span><span class="row-title">Sicherung laden</span></button>
+        <input type="file" accept=".json,application/json" data-restore hidden></div>
+      <p class="footnote">Speichert alle Fächer, deinen Stoff und deinen Fortschritt als Datei. So nimmst du alles auf ein anderes Gerät mit. <button class="linklike" data-view-go="help">So geht’s</button></p></section>` : ''}
     <p class="footnote" id="syncline"></p>`;
   renderSync();
 }
@@ -2474,6 +2479,39 @@ function importKa(){
   toast(topics.length + (topics.length === 1 ? ' Thema' : ' Themen') + ' und ' + gen.length + ' Fragen importiert.' + (bad ? ' ' + bad + ' Block(s) waren unvollständig.' : ''));
 }
 
+/* ---------- Sicherung speichern und laden ---------- */
+function saveBackup(){
+  const ka = {}, prog = {};
+  M.arbeiten.forEach(a => { ensure(a.id); ka[a.id] = C[a.id]; prog[a.id] = P[a.id]; });
+  const blob = new Blob([JSON.stringify({ app:'kognit', v:1, saved:new Date().toISOString(), meta:M, ka, prog })], { type:'application/json' });
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = 'kognit-sicherung-' + dayKey() + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  toast('Sicherung gespeichert. Du findest sie in deinen Downloads.');
+}
+async function loadBackup(file){
+  let d = null;
+  try { d = JSON.parse(await file.text()); } catch(e) {}
+  if (!d || d.app !== 'kognit' || !d.meta || !Array.isArray(d.meta.arbeiten) || !Array.isArray(d.meta.faecher)) { toast('Das ist keine Kognit-Sicherung.'); return; }
+  if (!(await dialog('Sicherung laden? Dein aktueller Stand auf diesem Gerät wird dabei ersetzt.', { ok:'Laden' }))) return;
+  const ka = d.ka || {}, prog = d.prog || {};
+  M = d.meta;
+  for (const a of M.arbeiten) {
+    const c = Object.assign(blankContent(), ka[a.id] && typeof ka[a.id] === 'object' ? ka[a.id] : {});
+    if (!Array.isArray(c.topics)) c.topics = [];
+    if (!Array.isArray(c.gen)) c.gen = [];
+    c.topics.forEach(t => { if (typeof t.html === 'string') t.html = sanitize(t.html); if (Array.isArray(t.alts)) t.alts = t.alts.filter(x => typeof x === 'string').map(x => sanitize(x)); });
+    C[a.id] = c;
+    P[a.id] = Object.assign(blankProg(), prog[a.id] && typeof prog[a.id] === 'object' ? prog[a.id] : {});
+    persist('ka-' + a.id, C[a.id]); persist('prog-' + a.id, P[a.id]);
+  }
+  persist('meta', M);
+  ui.ka = null; ui.deck = []; ui.exam = null; ui.alt = null; ui.kb = null;
+  go('list');
+  toast('Sicherung geladen.');
+}
+
 /* ---------- Anleitung ---------- */
 function renderHelp(){
   const cloud = syncState === 'cloud';
@@ -2489,7 +2527,23 @@ function renderHelp(){
         <li><b>Fokus-Timer:</b> lernen in Etappen mit Pausen.</li>
       </ul>
       <h3>Wo dein Fortschritt gespeichert wird</h3>
-      <p>${cloud ? 'Du nutzt die App in Claude. Dein Fortschritt wird in deinem Konto gespeichert und ist auf allen deinen Geräten da.' : 'Dein Fortschritt wird nur in diesem Browser auf diesem Gerät gespeichert. Lösch die Browserdaten nicht, sonst ist er weg. Auf einem anderen Gerät fängst du neu an.'}</p>
+      <p>${cloud ? 'Du nutzt die App in Claude. Dein Fortschritt wird in deinem Konto gespeichert und ist auf allen deinen Geräten da.' : 'Dein Fortschritt wird automatisch gespeichert, aber nur in diesem Browser auf diesem Gerät. Er bleibt da, wenn du die App morgen wieder öffnest. Weg ist er im privaten Modus, wenn du die Browserdaten löschst oder wenn du ein anderes Gerät nimmst. Deshalb gibt es die Sicherung.'}</p>
+      ${!(window.claude && window.claude.use) ? `<h3>Fortschritt sichern</h3>
+      <p>Mach ab und zu eine Sicherung, vor allem bevor du das Gerät wechselst.</p>
+      <p><b>Sicherung speichern</b></p>
+      <ol>
+        <li>Tippe auf „Fächer“ und scroll nach unten zu „Sicherung“.</li>
+        <li>Tippe auf „Sicherung speichern“.</li>
+        <li>Die Datei „kognit-sicherung-….json“ landet in deinen Downloads. Am iPhone findest du sie in der Dateien-App unter „Downloads“.</li>
+        <li>Schick sie dir per Mail oder leg sie in deine Cloud. Dann kommst du von jedem Gerät aus dran.</li>
+      </ol>
+      <p><b>Sicherung laden</b></p>
+      <ol>
+        <li>Öffne die App auf dem Gerät, auf dem du weitermachen willst, und tippe auf „Fächer“.</li>
+        <li>Tippe unter „Sicherung“ auf „Sicherung laden“ und wähl die Datei aus.</li>
+        <li>Bestätige mit „Laden“. Achtung: Der Stand, der auf diesem Gerät war, wird dabei ersetzt.</li>
+      </ol>
+      <div class="tip"><b>iPhone-Tipp:</b> Safari löscht die Daten, wenn du die Seite etwa 7 Tage nicht öffnest. So verhinderst du das: Link in Safari öffnen, auf das Teilen-Symbol (Quadrat mit Pfeil) tippen, dann „Zum Home-Bildschirm“ und „Hinzufügen“. Öffne die App ab jetzt nur noch über das neue Symbol. Hast du in Safari schon Fortschritt, speicherst du dort vorher eine Sicherung und lädst sie danach im App-Symbol.</div>` : ''}
       <h3>Eigenen Lernstoff hochladen</h3>
       <ol>
         <li>Tippe auf „Fächer“. Leg ein neues Fach an oder nimm ein vorhandenes.</li>
@@ -3131,6 +3185,7 @@ $main.addEventListener('change', e => {
   else if (t.matches('[data-ff="fachId"]')) { ui.form.fachId = t.value; render(); }
   else if (t.matches('[data-files]')) { ui.form.files = ui.form.files.concat(Array.from(t.files || [])); render(); }
   else if (t.id === 'ex-n') ui.exam.n = +t.value;
+  else if (t.matches('[data-restore]')) { const file = t.files && t.files[0]; t.value = ''; if (file) loadBackup(file); }
 });
 $main.addEventListener('input', e => {
   const t = e.target;
@@ -3167,6 +3222,8 @@ $main.addEventListener('click', async e => {
   else if ('cancelnew' in d) { ui.form = null; ui.build = null; go('list'); }
   else if ('build' in d) buildKa();
   else if ('importka' in d) importKa();
+  else if ('backup' in d) saveBackup();
+  else if ('restorebtn' in d) { const inp = $main.querySelector('[data-restore]'); if (inp) inp.click(); }
   else if ('copyprompt' in d) {
     const txt = importPrompt(); let done = false;
     try { await navigator.clipboard.writeText(txt); done = true; } catch(err) {}
