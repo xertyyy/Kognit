@@ -1749,7 +1749,6 @@ const queues = {}, timers = {};
 function persist(key, obj){
   obj.updated = Date.now();
   local.set(key, obj);
-  try { if (fb.user && key === 'prog-' + classKaId()) pushMember(false); } catch(e) {}
   if (!base) return;
   clearTimeout(timers[key]);
   timers[key] = setTimeout(() => {
@@ -1906,9 +1905,9 @@ function renderLogin(){
 }
 
 /* ---------- Klassen, nächste Klassenarbeit und Leaderboard (nur Website mit Konto) ---------- */
-const ADMIN_UID = '';
+const ADMIN_UID = '8rNNSHVDDsRgg5XpixdJZwH6Abn2';
 const DEFAULT_CLASSES = [{ id:'efs225', name:'EFS 225' }];
-const cls = { list:DEFAULT_CLASSES.slice(), info:null, board:null, boardAt:0, loading:false, pushT:0, lastReady:null };
+const cls = { list:DEFAULT_CLASSES.slice(), info:null, board:null, boardAt:0, loading:false, me:null };
 function isAdmin(){ return !!(fb.user && ADMIN_UID && fb.user.uid === ADMIN_UID); }
 function myClass(){ return M.profile && M.profile.classId ? M.profile.classId : null; }
 function className(id){ const c = cls.list.find(x => x.id === id); return c ? c.name : (cls.info && cls.info.id === id && cls.info.name) || id; }
@@ -1962,36 +1961,75 @@ async function classSync(){
         }
       }
     }
-    pushMember(true);
+    await ensureScore();
   } catch(e) { console.warn('Klasse konnte nicht geladen werden', e); }
 }
-function pushMember(now){
-  const cid = myClass(), kid = classKaId();
-  if (!fb.user || !cid || !kid || !M.profile || !cls.info || !cls.info.next) return;
-  clearTimeout(cls.pushT);
-  cls.pushT = setTimeout(() => {
-    const ready = readiness(kid);
-    if (now && cls.lastReady === ready) return;
-    cls.lastReady = ready;
-    fb.fs.doc('classes/' + cid + '/members/' + fb.user.uid).set({ name:String(M.profile.name || 'Unbekannt').slice(0, 30), ready, kaId:cls.info.next.id, updated:Date.now() })
-      .then(() => {
-        if (!cls.board) return;
-        let me = cls.board.find(r => r.uid === fb.user.uid);
-        if (me) me.ready = ready; else cls.board.push(me = { uid:fb.user.uid, name:String(M.profile.name || 'Unbekannt').slice(0, 30), ready });
-        cls.board.sort((a, b) => b.ready - a.ready || a.name.localeCompare(b.name, 'de'));
-        if (['list', 'home'].includes(ui.view) && !ui.build) render();
-      })
-      .catch(() => {});
-  }, now ? 0 : 1500);
+/* Jede Quiz-Antwort wird einzeln mit Server-Zeitstempel protokolliert (höchstens eine alle 3 Sekunden).
+   Die Firestore-Regeln lassen die Punkteliste nur wachsen, wenn im selben Schritt genau diese Antwort gespeichert wird. */
+function scoreRef(cid){ return fb.fs.doc('classes/' + cid + '/scores/' + fb.user.uid); }
+async function ensureScore(){
+  const cid = myClass(), nx = cls.info && cls.info.next;
+  if (!fb.user || !cid || !nx || !M.profile) { cls.me = null; return; }
+  const name = String(M.profile.name || 'Unbekannt').trim().slice(0, 30) || 'Unbekannt';
+  try {
+    const d = await scoreRef(cid).get();
+    if (!d.exists) {
+      await scoreRef(cid).set({ name, kaId:nx.id, h:{}, lastAt:firebase.firestore.FieldValue.serverTimestamp(), lastId:'' });
+      cls.me = { name, kaId:nx.id, h:{} };
+    } else {
+      const x = d.data() || {};
+      cls.me = { name:x.name, kaId:x.kaId, h:x.h || {} };
+      if (x.kaId !== nx.id) { await scoreRef(cid).update({ kaId:nx.id, h:{} }); cls.me.kaId = nx.id; cls.me.h = {}; }
+      if (x.name !== name) { await scoreRef(cid).update({ name }); cls.me.name = name; }
+    }
+  } catch(e) { cls.me = null; }
 }
+const ansQ = []; let ansBusy = false, ansLast = 0;
+function classAnswer(q, tid, score){
+  try {
+    if (!fb.user || !q || q.t === 'free' || !ui.ka || ui.ka !== classKaId() || !cls.me) return;
+    ansQ.push({ q:String(q.id || q.q || '').slice(0, 80), t:String(tid || '').slice(0, 40), s:Math.max(0, Math.min(1, Math.round(score * 100) / 100)), tries:0 });
+    pumpAnswers();
+  } catch(e) {}
+}
+async function pumpAnswers(){
+  if (ansBusy) return; ansBusy = true;
+  try {
+    while (ansQ.length) {
+      const wait = ansLast + 3300 - Date.now();
+      if (wait > 0) await new Promise(r => setTimeout(r, wait));
+      const a = ansQ[0], cid = myClass(), me = cls.me;
+      if (!fb.user || !cid || !me) { ansQ.length = 0; break; }
+      const ref = fb.fs.collection('classes/' + cid + '/scores/' + fb.user.uid + '/answers').doc();
+      const old = (me.h && me.h[a.t]) || [], next = (old.length < 20 ? old : old.slice(1, 20)).concat([a.s]);
+      const h = Object.assign({}, me.h || {}, { [a.t]:next }), now = firebase.firestore.FieldValue.serverTimestamp();
+      const batch = fb.fs.batch();
+      batch.set(ref, { q:a.q, t:a.t, s:a.s, kaId:me.kaId, at:now });
+      batch.update(scoreRef(cid), { h, lastAt:now, lastId:ref.id });
+      try {
+        await batch.commit(); me.h = h; ansQ.shift(); ansLast = Date.now();
+        if (cls.board) { let r = cls.board.find(x => x.uid === fb.user.uid); if (!r) cls.board.push(r = { uid:fb.user.uid, name:me.name, h:{} }); r.h = h; sortBoard(); if (['list', 'home'].includes(ui.view) && !ui.build) render(); }
+      } catch(e) {
+        ansLast = Date.now();
+        if (++a.tries >= 3) ansQ.shift(); else await ensureScore();
+      }
+    }
+  } finally { ansBusy = false; }
+}
+function boardReady(h){
+  const ts = topicsOf(classKaId());
+  if (!ts.length || !h) return 0;
+  const vals = ts.map(t => { const v = Array.isArray(h[t.id]) ? h[t.id].filter(x => typeof x === 'number') : []; if (!v.length) return 0; const avg = v.reduce((x, y) => x + Math.max(0, Math.min(1, y)), 0) / v.length; return avg * Math.min(1, v.length / 5); });
+  return Math.round(vals.reduce((x, y) => x + y, 0) / ts.length * 100);
+}
+function sortBoard(){ (cls.board || []).forEach(r => { r.ready = boardReady(r.h); }); (cls.board || []).sort((a, b) => b.ready - a.ready || a.name.localeCompare(b.name, 'de')); }
 async function loadBoard(){
   const cid = myClass();
   if (!fb.user || !cid || !cls.info || !cls.info.next) { cls.board = null; return; }
   try {
-    const q = await fb.fs.collection('classes/' + cid + '/members').where('kaId', '==', cls.info.next.id).get(), arr = [];
-    q.forEach(d => { const x = d.data() || {}; arr.push({ uid:d.id, name:String(x.name || '?').slice(0, 30), ready:Math.max(0, Math.min(100, Math.round(+x.ready || 0))) }); });
-    arr.sort((a, b) => b.ready - a.ready || a.name.localeCompare(b.name, 'de'));
-    cls.board = arr;
+    const q = await fb.fs.collection('classes/' + cid + '/scores').where('kaId', '==', cls.info.next.id).get(), arr = [];
+    q.forEach(d => { const x = d.data() || {}; arr.push({ uid:d.id, name:String(x.name || '?').slice(0, 30), h:x.h && typeof x.h === 'object' ? x.h : {} }); });
+    cls.board = arr; sortBoard();
   } catch(e) { cls.board = cls.board || []; }
   cls.boardAt = Date.now();
 }
@@ -2017,7 +2055,7 @@ function classCardHtml(){
   if (!fb.user || !a || !cls.info) return '';
   return `<section style="${fachStyle(a.fachId)}"><h2 class="group-title"><i class="fdot" aria-hidden="true"></i>Nächste Klassenarbeit · ${esc(cls.info.name)}</h2>
     <div class="glass list classcard">${kaRow(a)}
-      <div class="cc-board"><p class="cc-head">Leaderboard <small>Bereit-% aus dem Quiz</small></p>${boardHtml(3)}</div>
+      <div class="cc-board"><p class="cc-head">Leaderboard <small>Bereit-% aus dem Quiz, freie Antworten zählen nicht</small></p>${boardHtml(3)}</div>
       <button class="row add" data-open="${a.id}"><span class="add-ic">→</span><span class="row-title">Ganzes Leaderboard ansehen</span></button></div></section>`;
 }
 function classSectionHtml(){
@@ -2088,9 +2126,9 @@ async function showClassPicker(then){
     if (cid && !name) { toast('Gib deinen Vornamen ein.'); return; }
     const old = myClass();
     M.profile = { classId:cid || null, name, asked:true }; persist('meta', M);
-    if (old && old !== cid && fb.user) fb.fs.doc('classes/' + old + '/members/' + fb.user.uid).delete().catch(() => {});
+    if (old && old !== cid && fb.user) fb.fs.doc('classes/' + old + '/scores/' + fb.user.uid).delete().catch(() => {});
     el.remove(); if (!gate.el && !tour.el) document.documentElement.classList.remove('gated');
-    cls.info = null; cls.board = null; cls.boardAt = 0; cls.lastReady = null;
+    cls.info = null; cls.board = null; cls.boardAt = 0; cls.me = null;
     await classSync(); await loadBoard();
     if (!ui.build && !(ui.exam && ui.exam.phase === 'run')) render();
     if (then) then();
@@ -3374,7 +3412,7 @@ function renderHome(){
     </section>
     <button class="glass next" data-next="${ns.act}" data-id="${ns.id}"><span class="next-ic">${ns.icon}</span>
       <span class="row-main"><span class="row-sub">Als Nächstes</span><span class="row-title">${esc(ns.title)}</span></span>${I.chev}</button>
-    ${fb.user && kid === classKaId() && cls.info ? `<h2 class="group-title">Leaderboard · ${esc(cls.info.name)}</h2><div class="glass pad board-card"><p class="cc-head" style="margin-top:0">Bereit-% aus dem Quiz</p>${boardHtml()}</div>` : ''}
+    ${fb.user && kid === classKaId() && cls.info ? `<h2 class="group-title">Leaderboard · ${esc(cls.info.name)}</h2><div class="glass pad board-card"><p class="cc-head" style="margin-top:0">Bereit-% aus dem Quiz <small>freie Antworten zählen nicht, neue Ergebnisse ersetzen alte</small></p>${boardHtml()}</div>` : ''}
     <h2 class="group-title">Lernpfad</h2>
     <div class="glass path">${rows || '<div class="step"><span class="row-sub">Noch keine Themen.</span></div>'}</div>
     <h2 class="group-title">Probeprüfung</h2>
@@ -3875,7 +3913,7 @@ $main.addEventListener('click', async e => {
   else if (d.qt) { if (d.qt === ui.qTopic) return; const prevRow = $main.querySelector('.chips'), sl = prevRow ? prevRow.scrollLeft : 0; ui.qTopic = d.qt; ui.genMsg = ''; startDeck(); render(); const row = $main.querySelector('.chips'); if (row) { row.scrollLeft = sl; centerChip(row); } animateIn($main.querySelector('.qcard,.summary'), 'enter-swap'); navPush(); }
   else if (d.mode) { if (M.mode === d.mode) return; const cur = ui.deck[ui.idx]; if (ui.answered && cur && cur.t === 'calc') { ui.idx++; ui.answered = false; ui.sel = null; } if (!ui.answered) ui.resp = {}; M.mode = d.mode; persist('meta', M); render(); }
   else if (d.opt != null) { ui.sel = +d.opt; render(); }
-  else if ('checkmc' in d) { const q = ui.deck[ui.idx]; ui.answered = true; const s = ui.sel === q.a ? 1 : 0; ui.session.n++; ui.session.sum += s; record(q.topic, s); afterCheck(s); qSave(); render(); }
+  else if ('checkmc' in d) { const q = ui.deck[ui.idx]; ui.answered = true; const s = ui.sel === q.a ? 1 : 0; ui.session.n++; ui.session.sum += s; record(q.topic, s); classAnswer(q, q.topic, s); afterCheck(s); qSave(); render(); }
   else if ('checkfree' in d) {
     const q = ui.deck[ui.idx], text = String(ui.resp.text || '').trim();
     if (!text) { const ta = $main.querySelector('textarea.free'); if (ta) ta.focus(); return; }
@@ -3893,7 +3931,7 @@ $main.addEventListener('click', async e => {
     else fields = sol.answers.map(a => [resp[a.key], a.value, a.unit === '%' ? .05 : .02]);
     if (fields.every(f => !String(f[0] || '').trim())) { const inp = $main.querySelector('.qcard input'); if (inp) inp.focus(); return; }
     const score = fields.filter(f => ok(f[0], f[1], f[2])).length / fields.length;
-    ui.lastScore = score; ui.answered = true; ui.session.n++; ui.session.sum += score; record(q.topic, score); afterCheck(score); qSave(); render();
+    ui.lastScore = score; ui.answered = true; ui.session.n++; ui.session.sum += score; record(q.topic, score); classAnswer(q, q.topic, score); afterCheck(score); qSave(); render();
   }
   else if ('hint' in d) showHint();
   else if ('qback' in d) qGo(-1);
