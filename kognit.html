@@ -323,6 +323,7 @@ details summary{cursor:pointer;color:var(--blue);font-weight:600;margin-top:12px
 @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.04)}100%{transform:scale(1)}}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-4px)}80%{transform:translateX(2px)}}
 .action-bar{position:sticky;bottom:calc(var(--tabbar) + 18px + env(safe-area-inset-bottom,0px));z-index:5;margin-top:14px;padding:12px;display:grid;gap:10px;border-radius:26px}
+.action-bar.flow{position:relative;bottom:auto}
 .action-bar .btn{width:100%}
 .action-bar .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .action-bar .three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
@@ -405,6 +406,29 @@ html.gated #toast{z-index:1001}
 @media (prefers-reduced-motion: reduce){.gate-head .gate-title{animation:none}}
 .gate-head .gate-tag{margin:-2px 0 6px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--label2)}
 .gate-card .btn{width:100%}
+html.touring,html.touring body{overflow:hidden}
+#tour{position:fixed;inset:0;z-index:1000}
+.tour-spot{position:fixed;pointer-events:none;box-shadow:0 0 0 200vmax rgba(0,0,0,.62),0 0 0 2px rgba(255,255,255,.85),0 0 28px 6px rgba(255,255,255,.18);transition:top .5s cubic-bezier(.2,1.1,.3,1),left .5s cubic-bezier(.2,1.1,.3,1),width .5s cubic-bezier(.2,1.1,.3,1),height .5s cubic-bezier(.2,1.1,.3,1),border-radius .5s}
+:root{--tour-bg:#FFFFFF}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--tour-bg:#1C1C1E}}
+:root[data-theme="dark"]{--tour-bg:#1C1C1E}
+:root[data-theme="light"]{--tour-bg:#FFFFFF}
+.tour-tip{position:fixed;padding:14px 16px 14px;border-radius:20px;background:var(--tour-bg);border:1px solid var(--glass-edge);box-shadow:0 22px 60px rgba(0,0,0,.4);transition:top .5s cubic-bezier(.2,1.1,.3,1),left .5s cubic-bezier(.2,1.1,.3,1),opacity .2s ease,transform .25s ease}
+.tour-tip.out{opacity:0;transform:translateY(8px)}
+.tour-tip.center{top:50%;left:50%;transform:translate(-50%,-50%)}
+.tour-tip.center.out{transform:translate(-50%,-46%)}
+.tour-tip::before{content:"";position:absolute;left:calc(var(--ax,50%) - 7px);width:14px;height:14px;background:var(--tour-bg);border:1px solid var(--glass-edge);transform:rotate(45deg)}
+.tour-tip[data-side="below"]::before{top:-8px;border-right:0;border-bottom:0}
+.tour-tip[data-side="above"]::before{bottom:-8px;border-left:0;border-top:0}
+.tour-tip.center::before,.tour-tip[data-side="none"]::before{display:none}
+.tt-bar{height:4px;border-radius:2px;background:var(--sep);overflow:hidden;margin:0 0 10px}
+.tt-bar i{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,var(--kg1),var(--kg3));transition:width .4s ease}
+.tt-step{margin:0;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--label2)}
+.tour-tip h3{margin:2px 0 6px;font-size:19px;line-height:1.25;letter-spacing:-.01em;color:var(--label)}
+.tour-tip > p:not(.tt-step){margin:0;font-size:15px;line-height:1.45;color:var(--label2)}
+.tt-nav{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap}
+.tt-skip{margin-right:auto;font-size:14px}
+@media (prefers-reduced-motion: reduce){.tour-spot,.tour-tip{transition:opacity .2s}}
 .gate-note{margin:0;text-align:center;font-size:13px;line-height:1.45;color:var(--label2)}
 .gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:46px;padding:0 18px;border-radius:999px;border:1px solid #DADCE0;background:#FFFFFF;color:#1F1F1F;font:inherit;font-size:16px;font-weight:600;cursor:pointer;transition:background .2s,transform .12s}
 .gbtn:hover{background:#F8F9FA}
@@ -463,6 +487,15 @@ nav.tabs button[aria-current="page"]{background:none}
 /* Seitenwechsel */
 main{view-transition-name:main}
 nav.tabs .bar{view-transition-name:tabbar}
+.timer-fab{view-transition-name:timerfab}
+.set-fab{view-transition-name:setfab}
+::view-transition-old(setfab){display:none}
+::view-transition-new(setfab){animation:none}
+.set-fab.on{color:var(--label)}
+.set-fab.on .ic{color:var(--accent-ink);filter:drop-shadow(0 0 6px rgba(var(--acc-rgb),.6))}
+.set-fab.on .lb{color:var(--accent-ink)}
+::view-transition-old(timerfab){display:none}
+::view-transition-new(timerfab){animation:none}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.25s}
 ::view-transition-old(main){animation:vt-out .2s ease both}
 ::view-transition-new(main){animation:vt-in .55s var(--spring-soft) both}
@@ -780,7 +813,12 @@ nav.tabs button[aria-current="page"] svg{transform:scale(1.1)}
 .navbtn:not(:disabled):active{transform:scale(.88);transition-duration:.12s}
 .navbtn:disabled{opacity:.3;cursor:default}
 .qnav{display:flex;align-items:center;gap:10px}
-.qnav .btn.big{flex:1 1 auto;width:auto}
+.qnav .btn.big{flex:1 1 0;width:auto;min-width:0}
+.qnav .qback{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.qnav .qback svg{width:17px;height:17px;flex:0 0 17px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.pill-pair{display:inline-flex;gap:6px;flex:0 0 auto}
+.pill-btn.alt{background:transparent;color:var(--accent-ink);border:1px solid rgba(var(--acc-rgb),.35)}
+@media (max-width:380px){.pill-pair .pill-btn{padding:7px 11px;font-size:13.5px}}
 .qnav .navbtn{width:52px;height:52px;flex-basis:52px;background:var(--glass-hi)}
 .qnav .grow{flex:1}
 .newtag.rev-tag{background:rgba(var(--acc-rgb),.16);color:var(--accent-ink)}
@@ -839,6 +877,34 @@ nav.tabs button[aria-current="page"] svg{transform:scale(1.1)}
   *,*::before,*::after{animation:none !important;transition:none !important}
 }
 
+/* ---------- Schmale Handys: Leiste mit Profil, Tabs und Timer passt in eine Zeile ---------- */
+@media (max-width: 460px) {
+  nav.tabs{gap:4px;padding-left:4px;padding-right:4px}
+  nav.tabs .bar{flex:1 1 auto;min-width:0;max-width:330px;padding:4px}
+  nav.tabs .bar button{min-width:0;flex:1 1 0;padding:7px 1px 6px;font-size:9px;letter-spacing:-.02em}
+  nav.tabs .timer-fab{flex:0 0 46px;width:46px;min-width:46px;height:46px;padding:0;border-radius:50%;justify-content:center}
+  nav.tabs .timer-fab .lb{display:none}
+  nav.tabs .timer-fab.run .ic{display:none}
+  nav.tabs .timer-fab.run .lb{display:block;font-size:11px}
+  nav.tabs .timer-fab .ic svg{width:22px;height:22px}
+}
+@media (max-width: 345px) {
+  nav.tabs .bar button{font-size:7.5px;letter-spacing:-.03em}
+}
+
+/* ---------- Handy: flüssiger ---------- */
+@media (hover: none), (pointer: coarse) {
+  /* Karten ohne Live-Unschärfe: auf dem Handy der größte Bremsklotz */
+  main *, main .glass, main .sheet, .chip, .pill, .countdown, .themebtn { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  main .glass, main .sheet, .action-bar { background-color: var(--glass-solid); background-image: linear-gradient(180deg, var(--sheen), transparent 42%); }
+  .glass, .sheet { box-shadow: var(--glass-shadow), inset 0 1px 0 var(--spec); }
+  .chip, .pill, .countdown, .themebtn { background-color: var(--glass-solid); }
+  /* Leisten oben und unten behalten ihr Glas, nur leichter */
+  nav.tabs .bar, .timer-fab, .navbar, .timer-sheet { -webkit-backdrop-filter: blur(16px) saturate(170%); backdrop-filter: blur(16px) saturate(170%); }
+  /* Dauer-Animationen aus: der Farbrand bleibt, dreht sich aber nicht mehr */
+  nav.tabs .bar::before, .timer-fab::before, .step.cur .node { animation: none; }
+}
+
 </style>
 </head>
 <body>
@@ -862,7 +928,7 @@ try{mq.addEventListener('change',lab)}catch(e){}lab();})();
 </script>
 <div class="navbar" id="navbar" aria-hidden="true"><span id="navtitle"></span></div>
 <main id="main"></main>
-<nav class="tabs" aria-label="Bereiche"><div class="bar"><span class="lens" aria-hidden="true"></span>
+<nav class="tabs" aria-label="Bereiche"><button type="button" class="timer-fab set-fab" id="setfab" aria-label="Profil und Einstellungen"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg></span><span class="lb">Profil</span></button><div class="bar"><span class="lens" aria-hidden="true"></span>
   <button data-view="list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5-9 4.5z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/></svg><span>Fächer</span></button>
   <button data-view="home"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 3.5v4"/></svg><span>Übersicht</span></button>
   <button data-view="kb"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5Z"/><path d="M12 6.5v13"/></svg><span>Wissen</span></button>
@@ -1765,7 +1831,7 @@ async function fbStart(){
     try { await fb.auth.getRedirectResult(); } catch(e) { fb.err = fbErr(e); }
     fb.auth.onAuthStateChanged(async u => {
       fb.user = u || null; gate.loading = false;
-      if (u) { guestMode = false; hideGate(); await fbSync(local.get('fbuid') !== u.uid); if (ui.view === 'login') go('list'); }
+      if (u) { guestMode = false; hideGate(); await fbSync(local.get('fbuid') !== u.uid); if (ui.view === 'login') go('settings'); }
       else { db = null; base = null; syncState = 'local'; if (!guestMode) paintGate(); if (ui.view === 'list' || ui.view === 'login') render(); else renderSync(); }
     });
   } catch(e) { fb.failed = true; gate.loading = false; paintGate(); }
@@ -1824,6 +1890,104 @@ function renderLogin(){
     </div></div>`;
 }
 
+/* ---------- Einführungstour mit Spotlight ---------- */
+const TOUR_KEY = 'kognit-tour-v2';
+const tour = { el:null, i:0, dir:1, steps:[], tgt:null, busy:false };
+function tourSteps(){
+  const hosted = !(window.claude && window.claude.use);
+  const exId = M.arbeiten.some(a => a.id === STARTER.ka.id) ? STARTER.ka.id : (M.arbeiten[0] ? M.arbeiten[0].id : null);
+  const toList = () => { if (ui.view !== 'list') go('list'); };
+  const toHome = () => { if (ui.ka !== exId || ui.view !== 'home') openKa(exId); };
+  return [
+    { t:'Willkommen bei Kognit', h:'Hier bereitest du dich auf deine Klassenarbeiten vor: Stoff lesen, üben und eine Probeprüfung schreiben. Ich zeige dir kurz, wo alles ist.', prep:toList },
+    { sel:'nav.tabs button[data-view="list"]', prep:toList, t:'Fächer', h:'Hier findest du alle deine Fächer. Von hier aus legst du alles an.' },
+    { sel:'#main .row.ka', up:'.glass', prep:toList, t:'Fach und Klassenarbeit', h:'Oben steht der Name des Fachs, darunter seine Klassenarbeiten mit Datum und der Zeit, die noch bleibt. Tippe eine Klassenarbeit an, um mit dem Lernen anzufangen.' },
+    { sel:'#main [data-newka]', prep:toList, t:'Klassenarbeit hinzufügen', h:'Hier legst du eine neue Klassenarbeit in diesem Fach an, mit Titel und Datum.' },
+    { sel:'#newfach', up:'.glass', prep:toList, t:'Neues Fach', h:'Gibt es dein Fach noch nicht? Tipp hier den Namen ein, z.\u00a0B. „Mathe“, und dann auf „Hinzufügen“.' },
+    { sel:'#main [data-view-go="help"]', up:'.glass', prep:toList, t:'Eigener Lernstoff', h:'In der Anleitung steht Schritt für Schritt, wie eine kostenlose KI aus deinen Unterlagen Lernseiten und Quizfragen macht. Darunter kannst du diese Tour jederzeit neu starten.' },
+    { sel:'#setfab', t:'Profil', h: hosted ? 'Hier sind dein Konto, dein Lernstand zum Herunter- und Hochladen und die Anleitung.' + (fb.user ? '' : ' Melde dich hier an, damit dein Fortschritt gespeichert wird. Als Gast ist beim Neuladen alles weg.') : 'Hier findest du die Anleitung und kannst diese Tour neu starten.' },
+    exId && { sel:'#main .hero', prep:toHome, t:'Deine Übersicht', h:'Öffnest du eine Klassenarbeit, landest du hier. Der äußere Ring zeigt, wie bereit du bist, berechnet aus deinen Quiz-Antworten. Der innere zeigt, wie viele Themen du schon gelesen hast.' },
+    exId && { sel:'#main .next', prep:toHome, t:'Als Nächstes', h:'Hier steht immer, was du als Nächstes machen solltest. Einfach antippen.' },
+    exId && { sel:'nav.tabs button[data-view="kb"]', prep:toHome, t:'Wissen', h:'Lernseiten zu jedem Thema. Unklar? Tippe auf „Erklär’s mir anders“. Verstanden? „Als gelesen abhaken“.' },
+    exId && { sel:'nav.tabs button[data-view="quiz"]', prep:toHome, t:'Quiz', h:'Hier übst du mit Fragen. Wenn du nicht weiterkommst, tippe auf „Tipp“.' },
+    exId && { sel:'nav.tabs button[data-view="exam"]', prep:toHome, t:'Prüfung', h:'Eine Probeklausur mit Note. Mach sie zum Schluss, wenn du dich bereit fühlst.' },
+    { sel:'#timerfab', t:'Timer', h:'Damit lernst du in Etappen mit kurzen Pausen dazwischen.' },
+    { t:'Los geht’s!', end:true, ex:exId, h:'Am besten gehst du so vor: Lernseiten lesen, im Quiz üben und zum Schluss die Probeprüfung.' + (hosted && !fb.user ? ' Tipp: Melde dich unter „Profil“ an, damit nichts verloren geht.' : '') }
+  ].filter(Boolean);
+}
+function maybeTour(){ let seen = false; try { seen = localStorage.getItem(TOUR_KEY) === '1'; } catch(e) {} if (!seen) setTimeout(() => openTour(0), 400); }
+function tourKey(e){ if (!tour.el) return; if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); tourGo(1); } else if (e.key === 'ArrowLeft') tourGo(-1); else if (e.key === 'Escape') closeTour(false); }
+function openTour(i){
+  if (tour.el) return;
+  const el = document.createElement('div');
+  el.id = 'tour';
+  el.innerHTML = '<div class="tour-spot"></div><div class="tour-tip out" role="dialog" aria-modal="true" aria-live="polite"></div>';
+  document.body.appendChild(el); tour.el = el; tour.i = i || 0; tour.dir = 1; tour.steps = tourSteps(); tour.tgt = null;
+  document.documentElement.classList.add('touring');
+  el.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const d = b.dataset;
+    if ('tnext' in d) tourGo(1); else if ('tprev' in d) tourGo(-1); else if ('tskip' in d || 'tdone' in d) closeTour(false); else if ('texample' in d) closeTour(true); });
+  document.addEventListener('keydown', tourKey);
+  window.addEventListener('resize', tourPlace); window.addEventListener('scroll', tourPlace, true);
+  tourPlace(); tourShow();
+}
+function tourGo(step){ if (!tour.el || tour.busy) return; const j = tour.i + step; if (j < 0) return; if (j >= tour.steps.length) { closeTour(false); return; } tour.dir = step; tour.i = j; tourShow(); }
+async function tourShow(){
+  const st = tour.steps[tour.i]; if (!st) { closeTour(false); return; }
+  tour.busy = true;
+  const tip = tour.el.querySelector('.tour-tip'); tip.classList.add('out');
+  const v0 = ui.view, k0 = ui.ka;
+  if (st.prep) st.prep();
+  await new Promise(r => setTimeout(r, ui.view !== v0 || ui.ka !== k0 ? 360 : 120));
+  if (!tour.el) return;
+  const find = () => { let x = st.sel ? document.querySelector(st.sel) : null; if (x && st.up) x = x.closest(st.up) || x; return x && x.getClientRects().length ? x : null; };
+  let t = find();
+  for (let w = 0; st.sel && !t && w < 25; w++) { await new Promise(r => setTimeout(r, 80)); if (!tour.el) return; t = find(); }
+  if (st.sel && !t) { tour.busy = false; const j = tour.i + (tour.dir || 1); if (j < 0 || j >= tour.steps.length) closeTour(false); else { tour.i = j; tourShow(); } return; }
+  tour.tgt = t;
+  if (t && !t.closest('nav')) { t.scrollIntoView({ block:'center', behavior:'smooth' }); await new Promise(r => setTimeout(r, 420)); }
+  if (!tour.el) return;
+  const n = tour.steps.length, last = tour.i === n - 1;
+  tip.innerHTML = `<div class="tt-bar"><i style="width:${Math.round((tour.i + 1) / n * 100)}%"></i></div>
+    <p class="tt-step">${tour.i + 1} von ${n}</p><h3>${st.t}</h3><p>${st.h}</p>
+    <div class="tt-nav">${last ? '' : '<button class="linklike tt-skip" data-tskip>Tour beenden</button>'}${tour.i ? '<button class="btn small ghost" data-tprev>Zurück</button>' : ''}${last ? (st.ex ? '<button class="btn small ghost" data-tdone>Selbst umschauen</button><button class="btn small" data-texample>Beispiel öffnen</button>' : '<button class="btn small" data-tdone>Fertig</button>') : `<button class="btn small" data-tnext>${tour.i ? 'Weiter' : 'Zeig’s mir'}</button>`}</div>`;
+  tourPlace();
+  requestAnimationFrame(() => { tip.classList.remove('out'); const b = tip.querySelector('[data-tnext], [data-texample], [data-tdone]'); if (b) b.focus({ preventScroll:true }); });
+  tour.busy = false;
+}
+function tourPlace(){
+  if (!tour.el) return;
+  const spot = tour.el.querySelector('.tour-spot'), tip = tour.el.querySelector('.tour-tip');
+  const vw = window.innerWidth, vh = window.innerHeight, pad = 8, gap = 14, tw = Math.min(360, vw - 24);
+  const t = tour.tgt;
+  if (!t || !t.isConnected) {
+    spot.style.cssText = `top:${vh / 2}px;left:${vw / 2}px;width:0;height:0;border-radius:50%`;
+    tip.classList.add('center'); tip.style.cssText = `width:${tw}px`; return;
+  }
+  tip.classList.remove('center');
+  const r = t.getBoundingClientRect();
+  const rad = parseFloat(getComputedStyle(t).borderTopLeftRadius) || 12;
+  spot.style.cssText = `top:${r.top - pad}px;left:${r.left - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px;border-radius:${Math.min(rad + pad, (r.height + pad * 2) / 2)}px`;
+  tip.style.width = tw + 'px';
+  const th = tip.offsetHeight;
+  let top = r.bottom + pad + gap, side = 'below';
+  if (top + th > vh - 12) { top = r.top - pad - gap - th; side = 'above'; }
+  if (top < 12) { top = Math.max(12, vh - th - 12); side = 'none'; }
+  const left = Math.max(12, Math.min(vw - tw - 12, r.left + r.width / 2 - tw / 2));
+  const ax = Math.max(22, Math.min(tw - 22, r.left + r.width / 2 - left));
+  tip.style.cssText = `top:${top}px;left:${left}px;width:${tw}px;--ax:${ax}px`;
+  tip.dataset.side = side;
+}
+function closeTour(openExample){
+  try { localStorage.setItem(TOUR_KEY, '1'); } catch(e) {}
+  if (tour.el) { tour.el.remove(); tour.el = null; }
+  tour.tgt = null; tour.busy = false;
+  document.removeEventListener('keydown', tourKey);
+  window.removeEventListener('resize', tourPlace); window.removeEventListener('scroll', tourPlace, true);
+  document.documentElement.classList.remove('touring');
+  if (openExample) { const st = tour.steps[tour.steps.length - 1]; if (st && st.ex) openKa(st.ex); }
+  else if (ui.view === 'list' || !ka(ui.ka)) render(); else go('list');
+}
+
 /* ---------- Startbildschirm: anmelden oder als Gast ---------- */
 const gate = { el:null, loading:true };
 function showGate(){
@@ -1847,8 +2011,8 @@ function paintGate(){
     <p class="gate-note">Mit Konto werden deine E-Mail-Adresse und dein Lernstand bei Google Firebase gespeichert. Andere Nutzer sehen sie nicht.</p>
   </div></div>`;
 }
-function hideGate(){ if (!gate.el) return; gate.el.remove(); gate.el = null; document.documentElement.classList.remove('gated'); }
-function enterGuest(){ guestMode = true; hideGate(); renderSync(); toast('Gastmodus: Es wird nichts gespeichert.'); }
+function hideGate(){ if (!gate.el) return; gate.el.remove(); gate.el = null; document.documentElement.classList.remove('gated'); maybeTour(); }
+function enterGuest(){ let seen = false; try { seen = localStorage.getItem(TOUR_KEY) === '1'; } catch(e) {} guestMode = true; hideGate(); renderSync(); if (seen) toast('Gastmodus: Es wird nichts gespeichert.'); }
 
 async function connect(){
   if (!window.claude || !window.claude.use) { syncState = 'local'; ui.sample = null; render(); showGate(); fbStart(); return; }
@@ -2065,12 +2229,13 @@ function qGo(dir){
 function qNavInject(){
   const total = ui.deck.length, backOk = ui.idx > 0 && !ui.grading, fwdOk = ui.idx < (ui.front || 0) && !ui.grading;
   const mk = dir => `<button class="navbtn" data-q${dir} ${(dir === 'back' ? backOk : fwdOk) ? '' : 'disabled'} aria-label="${dir === 'back' ? 'Vorherige Frage' : 'Nächste Frage'}">${dir === 'back' ? NAV_L : NAV_R}</button>`;
+  const mkBack = `<button class="btn big ghost qback" data-qback aria-label="Vorherige Frage">${NAV_L}<span>Zurück</span></button>`;
   const bar = $main.querySelector('.action-bar');
   if (bar) {
     const main = Array.from(bar.children).find(x => x.matches && x.matches('.btn.big'));
     const row = document.createElement('div'); row.className = 'qnav';
-    if (main) { main.replaceWith(row); row.innerHTML = mk('back'); row.appendChild(main); row.insertAdjacentHTML('beforeend', mk('fwd')); }
-    else { row.innerHTML = mk('back') + '<span class="grow"></span>' + mk('fwd'); bar.appendChild(row); }
+    if (main) { main.replaceWith(row); if (backOk) row.insertAdjacentHTML('beforeend', mkBack); row.appendChild(main); if (fwdOk) row.insertAdjacentHTML('beforeend', mk('fwd')); }
+    else if (backOk || fwdOk) { row.innerHTML = (backOk ? mkBack : '<span class="grow"></span>') + (fwdOk ? mk('fwd') : ''); bar.appendChild(row); }
   } else if (total && ui.idx >= total && backOk) {
     const ra = $main.querySelector('.summary .row-actions'); if (ra) ra.insertAdjacentHTML('afterbegin', `<button class="btn ghost" data-qback>${NAV_L} Letzte Frage</button>`);
   }
@@ -2384,7 +2549,7 @@ function statsHtml(kid){
   const total = p.total != null ? p.total : allH.length, right = p.right != null ? p.right : allH.reduce((a, b) => a + b, 0);
   const learnDays = Object.keys(p.days || {}).filter(k => p.days[k] > 0).length;
   const weak = ts.map(t => ({ t, l:level(kid, t.id) })).sort((a, b) => (a.l.n ? a.l.avg : -1) - (b.l.n ? b.l.avg : -1)).slice(0, 3);
-  const weakRows = weak.map(w => `<div class="row"><span style="display:grid;place-items:center;width:36px">${ticon(w.t)}</span><span class="row-main"><span class="row-title">${esc(w.t.title)}</span><span class="row-sub"><i class="lvl ${w.l.cls}"></i>${esc(w.l.label)}${w.l.n ? ` <span class="muted">${Math.round(w.l.avg * 100)} %</span>` : ''}</span></span><button class="pill-btn" data-practice="${w.t.id}">Üben</button></div>`).join('');
+  const weakRows = weak.map(w => `<div class="row"><span style="display:grid;place-items:center;width:36px">${ticon(w.t)}</span><span class="row-main"><span class="row-title">${esc(w.t.title)}</span><span class="row-sub"><i class="lvl ${w.l.cls}"></i>${esc(w.l.label)}${w.l.n ? ` <span class="muted">${Math.round(w.l.avg * 100)} %</span>` : ''}</span></span><span class="pill-pair"><button class="pill-btn alt" data-read="${w.t.id}">Lesen</button><button class="pill-btn" data-practice="${w.t.id}">Quiz</button></span></div>`).join('');
   return `<h2 class="group-title">Statistik</h2>
     <div class="stat-grid">
       <div class="glass metric"><b>${total}</b><span>Antworten</span></div>
@@ -2447,7 +2612,7 @@ function render(){
   const a = ka(ui.ka);
   document.querySelectorAll('nav.tabs button[data-view]').forEach(b => {
     const v = b.dataset.view;
-    b.setAttribute('aria-current', v === ui.view || (v === 'list' && (ui.view === 'new' || ui.view === 'help' || ui.view === 'login')) ? 'page' : 'false');
+    b.setAttribute('aria-current', v === ui.view || (v === 'list' && (ui.view === 'new' || ui.view === 'help')) ? 'page' : 'false');
     b.disabled = v !== 'list' && !a;
   });
   const cd = document.getElementById('countdown');
@@ -2458,23 +2623,25 @@ function render(){
   else if (ui.view === 'new') renderNew();
   else if (ui.view === 'help') renderHelp();
   else if (ui.view === 'login') renderLogin();
+  else if (ui.view === 'settings') renderSettings();
   else if (!a) { ui.view = 'list'; renderList(); }
   else if (ui.view === 'home') renderHome();
   else if (ui.view === 'kb') renderKb();
   else if (ui.view === 'quiz') renderQuiz();
   else if (ui.view === 'exam') renderExam();
+  { const sf = document.getElementById('setfab'); if (sf) { const on = ui.view === 'settings' || ui.view === 'login'; sf.classList.toggle('on', on); sf.setAttribute('aria-current', on ? 'page' : 'false'); } }
   enhance(); moveLens(); observeTitle(); countUp();
   saveUi();
 }
 function renderSync(){
   const el = document.getElementById('syncline');
-  if (el) el.textContent = syncState === 'connecting' ? 'Speicherort wird geprüft …' : syncState === 'cloud' ? 'Fortschritt wird auf allen deinen Geräten gespeichert.' : (guestMode ? 'Gastmodus: Es wird nichts gespeichert. Melde dich unter „Konto“ an, um deinen Fortschritt zu behalten.' : 'Fortschritt wird nur auf diesem Gerät gespeichert. ' + (window.claude && window.claude.use ? 'In der Claude-App wird er geräteübergreifend gesichert.' : 'Melde dich unter „Konto“ an, damit er auf allen Geräten da ist.'));
+  if (el) el.textContent = syncState === 'connecting' ? 'Speicherort wird geprüft …' : syncState === 'cloud' ? 'Fortschritt wird auf allen deinen Geräten gespeichert.' : (guestMode ? 'Gastmodus: Es wird nichts gespeichert. Melde dich unter „Profil“ an, um deinen Fortschritt zu behalten.' : 'Fortschritt wird nur auf diesem Gerät gespeichert. ' + (window.claude && window.claude.use ? 'In der Claude-App wird er geräteübergreifend gesichert.' : 'Melde dich unter „Profil“ an, damit er auf allen Geräten da ist.'));
 }
 function go(view){
   const prevView = ui.view;
   ui.view = view;
   if (view === 'home') ui.ringAnim = true;
-  if (view === 'quiz') { if (!ui.deck.length || ui.deckKa !== ui.ka) startDeck(); }
+  if (view === 'quiz') { if (!ui.deck.length || ui.deckKa !== ui.ka) { if (!quizRestore()) startDeck(); } }
   if (view === 'exam' && (!ui.exam || ui.exam.ka !== ui.ka)) ui.exam = { ka:ui.ka, phase:'start', n:15 };
   if (view === 'kb' && !topicOf(ui.ka, ui.kb)) { const t = topicsOf(ui.ka)[0]; ui.kb = t ? t.id : null; }
   viewChange(() => { render(); window.scrollTo(0, 0); }, prevView, view);
@@ -2508,11 +2675,19 @@ function renderList(){
   const orphans = M.arbeiten.filter(a => !fach(a.fachId));
   $main.innerHTML = `
     <div class="lt"><h1>Fächer</h1></div>
-    <div class="glass list" style="margin-bottom:22px"><button class="row add" data-view-go="help"><span class="add-ic">?</span><span class="row-title">Anleitung: so lädst du deinen eigenen Lernstoff hoch</span></button></div>
+    <div class="glass list" style="margin-bottom:22px"><button class="row add" data-view-go="help"><span class="add-ic">?</span><span class="row-title">Anleitung: so lädst du deinen eigenen Lernstoff hoch</span></button><button class="row add" data-tour><span class="add-ic">→</span><span class="row-title">Kurze Tour: so funktioniert Kognit</span></button></div>
     ${groups}
     ${orphans.length ? `<section style="--fach:#8E8E93;--fach-rgb:142,142,147"><h2 class="group-title">Ohne Fach</h2><div class="glass list">${orphans.map(kaRow).join('')}</div></section>` : ''}
     <section><h2 class="group-title">Neues Fach</h2>
       <div class="glass list"><div class="row field"><input id="newfach" type="text" placeholder="z. B. Deutsch, WiSo, LF3" maxlength="60" aria-label="Name des neuen Fachs"><button class="btn small" data-addfach>Hinzufügen</button></div></div></section>
+    <p class="footnote" id="syncline"></p>`;
+  renderSync();
+}
+
+/* ---------- Einstellungen (Knopf links neben der Leiste) ---------- */
+function renderSettings(){
+  $main.innerHTML = `
+    <div class="lt"><h1>Profil</h1></div>
     ${!(window.claude && window.claude.use) ? `<section><h2 class="group-title">Konto</h2>
       <div class="glass list">${fb.user ? `<div class="row"><span class="row-title">Angemeldet als ${esc(fb.user.email || 'Google-Konto')}</span></div>
         <button class="row add" data-fblogout><span class="add-ic">←</span><span class="row-title">Abmelden</span></button>` : `<button class="row add" data-view-go="login"><span class="add-ic">→</span><span class="row-title">Anmelden oder Konto erstellen</span></button>`}</div>
@@ -2522,6 +2697,8 @@ function renderList(){
         <button class="row add" data-restorebtn><span class="add-ic">↑</span><span class="row-title">Lernstand hochladen</span></button>
         <input type="file" accept=".json,application/json" data-restore hidden></div>
       <p class="footnote">Speichert alle Fächer, deinen Stoff und deinen Fortschritt als Datei. So nimmst du alles auf ein anderes Gerät mit. <button class="linklike" data-view-go="help">So geht’s</button></p></section>` : ''}
+    <section><h2 class="group-title">Hilfe</h2>
+      <div class="glass list"><button class="row add" data-view-go="help"><span class="add-ic">?</span><span class="row-title">Anleitung: eigenen Lernstoff hochladen</span></button><button class="row add" data-tour><span class="add-ic">\u2192</span><span class="row-title">Kurze Tour: so funktioniert Kognit</span></button></div></section>
     <p class="footnote" id="syncline"></p>`;
   renderSync();
 }
@@ -2533,7 +2710,7 @@ function renderNew(){
   const files = f.files.map((x, i) => `<li>${esc(x.name)} <span class="hint">(${Math.max(1, Math.round(x.size / 1024))} KB)</span> <button class="linklike" data-rmfile="${i}" ${busy ? 'disabled' : ''}>entfernen</button></li>`).join('');
   let avail = '';
   if (ui.sample === undefined) avail = '<p class="hint">Verbindung zu Claude wird geprüft …</p>';
-  else if (ui.sample === null) avail = '<div class="tip">Ohne Claude erstellst du dein Lernpaket weiter unten mit einer kostenlosen KI.</div>';
+  else if (ui.sample === null) avail = '';
   const log = b ? `<ul class="steps-log">${b.log.map(l => `<li class="${l.s}">${l.s === 'done' ? '✓ ' : l.s === 'err' ? '✗ ' : '… '}${esc(l.t)}</li>`).join('')}</ul>` : '';
   $main.innerHTML = `
     <div class="lt"><h1>Neue Klassenarbeit</h1></div>
@@ -2548,7 +2725,7 @@ function renderNew(){
       ${files ? `<ul class="files">${files}</ul>` : ''}`}
       ${avail}
       <div class="row-actions" style="margin-top:0">
-        <button class="btn" data-build ${busy || !ui.sample ? 'disabled' : ''}>${busy ? 'Lernpaket wird erstellt …' : b ? 'Noch einmal versuchen' : 'Lernpaket erstellen'}</button>
+        ${ui.sample === null ? '' : `<button class="btn" data-build ${busy || !ui.sample ? 'disabled' : ''}>${busy ? 'Lernpaket wird erstellt …' : b ? 'Noch einmal versuchen' : 'Lernpaket erstellen'}</button>`}
         <button class="btn ghost" data-cancelnew ${busy ? 'disabled' : ''}>Abbrechen</button>
       </div>
       ${busy ? '<p class="hint">Das dauert ein paar Minuten. Lass die App so lange offen.</p>' : ''}
@@ -2563,10 +2740,11 @@ function importCard(){
     <div class="glass pad"><div class="form">
       <p class="hint" style="margin:0">Klappt mit ChatGPT, Gemini oder Claude, auch in der kostenlosen Version. <button class="linklike" data-view-go="help">Genaue Anleitung</button></p>
       <ol class="imp-steps">
-        <li>Oben Fach, Titel und „Was kommt dran?“ ausfüllen.</li>
-        <li><button class="btn small" data-copyprompt>Prompt kopieren</button></li>
-        <li>In der KI einen neuen Chat öffnen, deine Unterlagen hochladen (PDF oder Fotos) und den Prompt einfügen. Schreib „weiter“, bis die KI „FERTIG“ schreibt.</li>
-        <li>Alle Codeblöcke der KI kopieren und hier untereinander einfügen.</li>
+        <li>Oben Titel, Datum und „Was kommt dran?“ ausfüllen.</li>
+        <li>Hier tippen: <button class="btn small" data-copyprompt>Prompt kopieren</button></li>
+        <li>chatgpt.com oder gemini.google.com öffnen. Über das „+“ deine Unterlagen hochladen, den Prompt einfügen und abschicken.</li>
+        <li>Beim grauen Kasten der KI oben rechts auf „Kopieren“ tippen und unten in das Feld einfügen. Dann bei der KI „weiter“ schreiben und den nächsten Kasten darunter einfügen, bis sie „FERTIG“ schreibt.</li>
+        <li>Auf „Lernpaket importieren“ tippen.</li>
       </ol>
       <textarea id="imp-prompt" readonly hidden aria-label="Prompt zum Kopieren"></textarea>
       <label>Antworten der KI<textarea data-ff="paste" placeholder="Hier alle Antworten der KI einfügen">${esc(f.paste || '')}</textarea></label>
@@ -2680,7 +2858,8 @@ function renderHelp(){
   $main.innerHTML = `
     <div class="lt"><h1>Anleitung</h1></div>
     <article class="glass kb help">
-      <p class="lead">So lernst du mit dieser App, auch mit deinem eigenen Stoff und ohne Claude-Konto.</p>
+      <p class="lead">So lernst du mit dieser App, auch mit deinem eigenen Stoff.</p>
+      <div class="kb-actions" style="margin:0 0 8px"><button class="btn small" data-tour>Kurze Tour starten</button></div>
       <h3>Was die App kann</h3>
       <ul>
         <li><b>Wissen:</b> Lernseiten zu jedem Thema. Mit „Erklär’s mir anders“ bekommst du bis zu fünf andere Erklärungen. Mit „Nächste“ blätterst du weiter.</li>
@@ -2689,40 +2868,57 @@ function renderHelp(){
         <li><b>Fokus-Timer:</b> lernen in Etappen mit Pausen.</li>
       </ul>
       <h3>Wo dein Fortschritt gespeichert wird</h3>
-      <p>${fb.user ? 'Du bist angemeldet. Dein Fortschritt wird in deinem Konto gespeichert und ist auf jedem Gerät da, auf dem du dich anmeldest.' : cloud ? 'Du nutzt die App in Claude. Dein Fortschritt wird in deinem Konto gespeichert und ist auf allen deinen Geräten da.' : (guestMode ? 'Du nutzt die App als Gast. Dabei wird nichts gespeichert: Wenn du die Seite schließt oder neu lädst, ist dein Fortschritt weg. Melde dich unter „Fächer“ bei „Konto“ an, mit Google oder mit E-Mail und Passwort. Dann wird alles gespeichert und ist auf jedem Gerät da. Was du als Gast schon gelernt hast, wird beim Anmelden übernommen.' : 'Ohne Konto wird dein Fortschritt automatisch gespeichert, aber nur in diesem Browser auf diesem Gerät. Er bleibt da, wenn du die App morgen wieder öffnest. Weg ist er im privaten Modus, wenn du die Browserdaten löschst oder wenn du ein anderes Gerät nimmst. Am einfachsten meldest du dich unter „Fächer“ bei „Konto“ an, mit Google oder mit E-Mail und Passwort. Dann ist alles auf jedem Gerät da. Ohne Konto hilft dir „Lernstand herunterladen“.')}</p>
+      <p>${fb.user ? 'Du bist angemeldet. Dein Fortschritt wird in deinem Konto gespeichert und ist auf jedem Gerät da, auf dem du dich anmeldest.' : cloud ? 'Du nutzt die App in Claude. Dein Fortschritt wird in deinem Konto gespeichert und ist auf allen deinen Geräten da.' : (guestMode ? 'Du nutzt die App als Gast. Dabei wird nichts gespeichert: Wenn du die Seite schließt oder neu lädst, ist dein Fortschritt weg. Melde dich unter „Profil“ an (der Knopf links neben der Leiste unten), mit Google oder mit E-Mail und Passwort. Dann wird alles gespeichert und ist auf jedem Gerät da. Was du als Gast schon gelernt hast, wird beim Anmelden übernommen.' : 'Ohne Konto wird dein Fortschritt automatisch gespeichert, aber nur in diesem Browser auf diesem Gerät. Er bleibt da, wenn du die App morgen wieder öffnest. Weg ist er im privaten Modus, wenn du die Browserdaten löschst oder wenn du ein anderes Gerät nimmst. Am einfachsten meldest du dich unter „Profil“ an (der Knopf links neben der Leiste unten), mit Google oder mit E-Mail und Passwort. Dann ist alles auf jedem Gerät da. Ohne Konto hilft dir „Lernstand herunterladen“.')}</p>
       ${!(window.claude && window.claude.use) ? `<h3>Lernstand herunterladen und hochladen</h3>
       <p>Lade deinen Lernstand ab und zu herunter, vor allem bevor du das Gerät wechselst oder wenn du als Gast lernst.</p>
       <p><b>Lernstand herunterladen</b></p>
       <ol>
-        <li>Tippe auf „Fächer“ und scroll nach unten zu „Lernstand“.</li>
+        <li>Tippe links neben der Leiste unten auf „Profil“.</li>
         <li>Tippe auf „Lernstand herunterladen“.</li>
         <li>Die Datei „kognit-lernstand-….json“ landet in deinen Downloads. Am iPhone findest du sie in der Dateien-App unter „Downloads“.</li>
         <li>Schick sie dir per Mail oder leg sie in deine Cloud. Dann kommst du von jedem Gerät aus dran.</li>
       </ol>
       <p><b>Lernstand hochladen</b></p>
       <ol>
-        <li>Öffne die App auf dem Gerät, auf dem du weitermachen willst, und tippe auf „Fächer“.</li>
+        <li>Öffne die App auf dem Gerät, auf dem du weitermachen willst, und tippe links neben der Leiste unten auf „Profil“.</li>
         <li>Tippe unter „Lernstand“ auf „Lernstand hochladen“ und wähl die Datei aus.</li>
         <li>Bestätige mit „Hochladen“. Achtung: Der Stand, der auf diesem Gerät war, wird dabei ersetzt.</li>
       </ol>
       <div class="tip"><b>iPhone-Tipp:</b> Safari löscht die Daten, wenn du die Seite etwa 7 Tage nicht öffnest. So verhinderst du das: Link in Safari öffnen, auf das Teilen-Symbol (Quadrat mit Pfeil) tippen, dann „Zum Home-Bildschirm“ und „Hinzufügen“. Öffne die App ab jetzt nur noch über das neue Symbol. Hast du in Safari schon Fortschritt, speicherst du dort vorher deinen Lernstand und lädst ihn danach im App-Symbol hoch.</div>` : ''}
-      <h3>Eigenen Lernstoff hochladen</h3>
+      <h3>Eigenen Lernstoff hochladen: Schritt für Schritt</h3>
+      <p>Du brauchst deine Unterlagen (Fotos vom Heft, Arbeitsblätter oder PDFs) und etwa 10 Minuten. Am einfachsten geht es am Computer, mit Kognit und der KI in zwei Tabs nebeneinander.</p>
+      ${!(window.claude && window.claude.use) ? '<div class="tip"><b>Wichtig:</b> Melde dich vorher an (Knopf „Profil“ links neben der Leiste unten). Als Gast ist alles weg, sobald die Seite neu lädt.</div>' : ''}
+      <p><b>Teil 1: Klassenarbeit anlegen</b></p>
       <ol>
-        <li>Tippe auf „Fächer“. Leg ein neues Fach an oder nimm ein vorhandenes.</li>
-        <li>Tippe beim Fach auf „Klassenarbeit hinzufügen“.</li>
-        <li>Fülle Titel, Datum und „Was kommt dran?“ aus. Schreib dort ab, was die Lehrkraft gesagt oder an die Tafel geschrieben hat.</li>
+        <li>Tippe in der Leiste unten auf <b>„Fächer“</b>.</li>
+        <li>Gibt es dein Fach noch nicht? Scroll nach unten zu <b>„Neues Fach“</b>, schreib den Namen ins Feld (z. B. „Mathe“) und tippe auf <b>„Hinzufügen“</b>.</li>
+        <li>Unter deinem Fach tippst du auf <b>„+ Klassenarbeit hinzufügen“</b>.</li>
+        <li>Füll oben aus: <b>Titel</b> (z. B. „Bruchrechnen“), <b>Datum</b> und bei <b>„Was kommt dran?“</b> alles, was die Lehrkraft dazu gesagt oder an die Tafel geschrieben hat.</li>
       </ol>
-      <p>Jetzt gibt es zwei Wege.</p>
+      ${window.claude && window.claude.use ? `<p>Jetzt gibt es zwei Wege.</p>
       <h3>Weg A: in Claude</h3>
       <p>Lade deine Unterlagen (PDFs oder Fotos) hoch und tippe auf „Lernpaket erstellen“. Claude baut Lernseiten und Fragen. Das dauert ein paar Minuten.</p>
-      <h3>Weg B: mit einer kostenlosen KI</h3>
-      <ol>
-        <li>Tippe auf „Prompt kopieren“.</li>
-        <li>Öffne eine KI deiner Wahl, zum Beispiel ChatGPT, Gemini oder Claude. Die kostenlose Version reicht.</li>
-        <li>Starte einen neuen Chat. Lade deine Unterlagen hoch oder füge den Text ein. Füge dann den Prompt ein und schick ihn ab.</li>
-        <li>Die KI antwortet mit einem Codeblock für das erste Thema. Schreib „weiter“, bis sie „FERTIG“ schreibt.</li>
-        <li>Kopiere jeden Codeblock, am einfachsten mit dem Kopieren-Knopf am Block. Füge alle untereinander in das Feld „Antworten der KI“ ein.</li>
-        <li>Tippe auf „Lernpaket importieren“. Fertig: Du hast Lernseiten, fünf Erklärungen pro Thema und Übungsfragen.</li>
+      <h3>Weg B: mit einer kostenlosen KI</h3>` : ''}
+      <p><b>Teil 2: Prompt kopieren</b></p>
+      <ol start="5">
+        <li>Scroll auf derselben Seite nach unten bis zum Kasten <b>„Mit einer kostenlosen KI“</b>.</li>
+        <li>Tippe dort auf den Knopf <b>„Prompt kopieren“</b>. Unten erscheint kurz „Prompt kopiert“. Erscheint stattdessen ein Feld mit Text, halte den Finger darauf, tippe auf „Alles auswählen“ und dann auf „Kopieren“.</li>
+        <li>Lass Kognit offen, du kommst gleich zurück.</li>
+      </ol>
+      <p><b>Teil 3: Die KI arbeiten lassen</b></p>
+      <ol start="8">
+        <li>Öffne in einem neuen Tab <b>chatgpt.com</b> oder <b>gemini.google.com</b> (oder die App davon). Die kostenlose Version reicht.</li>
+        <li>Tippe auf das <b>„+“</b> neben dem Eingabefeld und lade deine Fotos oder PDFs hoch.</li>
+        <li>Tippe ins Eingabefeld, halte den Finger gedrückt und wähl <b>„Einfügen“</b>. Am Computer geht das mit Strg + V (Mac: Cmd + V). Jetzt steht der Prompt im Feld. Schick ihn ab.</li>
+        <li>Die KI antwortet mit einem <b>grauen Kasten voller Text</b>, das ist ein Codeblock mit deinem ersten Thema.</li>
+      </ol>
+      <p><b>Teil 4: Antworten nach Kognit holen</b></p>
+      <ol start="12">
+        <li>Oben rechts am grauen Kasten ist ein Knopf <b>„Kopieren“</b> (oder „Copy“). Tipp darauf.</li>
+        <li>Wechsle zurück zu Kognit. Tippe in das große Feld <b>„Antworten der KI“</b>, halte gedrückt und wähl <b>„Einfügen“</b>.</li>
+        <li>Geh zurück zur KI, schreib <b>„weiter“</b> und schick es ab. Es kommt ein neuer grauer Kasten. Kopiere ihn und füge ihn in Kognit <b>unter</b> den bisherigen Text ein.</li>
+        <li>Wiederhole Schritt 14, bis die KI nur noch <b>„FERTIG“</b> schreibt.</li>
+        <li>Tippe in Kognit auf <b>„Lernpaket importieren“</b>. Fertig! Deine Klassenarbeit erscheint mit Lernseiten, fünf Erklärungen pro Thema und Quizfragen.</li>
       </ol>
       <div class="tip"><b>Tipps:</b> Lieber ein Kapitel nach dem anderen als alles auf einmal. Bricht eine Antwort mittendrin ab, schreib: „Schreib dieses Thema noch einmal vollständig.“ Klappt der Import nicht, kopiere den Codeblock noch einmal komplett.</div>
       <div class="tip"><b>Wichtig:</b> Auch eine KI macht Fehler. Vergleiche wichtige Zahlen und Regeln mit deinen Unterlagen. Lade keine privaten Daten hoch, denn deine Unterlagen gehen an den Anbieter der KI.</div>
@@ -2944,7 +3140,7 @@ function renderHome(){
       <button class="node" data-toggle="${t.id}" role="checkbox" aria-checked="${d}" aria-label="${esc(t.title)} als gelesen markieren"><svg viewBox="0 0 24 24" aria-hidden="true">${TI[topicIconName(t)]}</svg><span class="badge-ok">${I.check}</span></button>
       <button class="row-main" data-read="${t.id}"><span class="row-title">${esc(t.title)}</span>
         <span class="row-sub"><i class="lvl ${l.cls}"></i>${esc(l.label)}${l.n ? ` <span class="muted">${Math.round(l.avg * 100)} %</span>` : ''}</span></button>
-      <button class="pill-btn" data-practice="${t.id}">Üben</button></div>`;
+      <span class="pill-pair"><button class="pill-btn alt" data-read="${t.id}">Lesen</button><button class="pill-btn" data-practice="${t.id}">Quiz</button></span></div>`;
   }).join('');
   const ex = p.exams || [], last = ex[ex.length - 1];
   const fopts = M.faecher.map(x => `<option value="${x.id}" ${a.fachId === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
@@ -3009,7 +3205,30 @@ function kbArticle(t){
 }
 
 /* ---------- Quiz ---------- */
-function startDeck(){ ui.deckKa = ui.ka; const pool = poolOf(ui.ka); ui.deck = shuffle(ui.qTopic === 'all' ? pool : pool.filter(q => q.topic === ui.qTopic)); ui.idx = 0; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null; ui.session = { n:0, sum:0 }; ui.summaryDone = false; }
+function startDeck(){ ui.deckKa = ui.ka; const pool = poolOf(ui.ka); ui.deck = shuffle(ui.qTopic === 'all' ? pool : pool.filter(q => q.topic === ui.qTopic)).slice(0, QUIZ_N); ui.idx = 0; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null; ui.session = { n:0, sum:0 }; ui.summaryDone = false; }
+/* Quiz-Runde merken, damit sie beim Wechseln oder Neuladen nicht verloren geht */
+const QUIZ_N = 5, quizMem = {};
+function quizKeep(){
+  if (!ui.deckKa || !ui.deck.length) return;
+  const s = { qTopic:ui.qTopic, deck:ui.deck, idx:ui.idx, front:ui.front || 0, qlog:ui.qlog || [], draft:ui.draft || null, session:ui.session, summaryDone:!!ui.summaryDone, cur:qSnap() };
+  quizMem[ui.deckKa] = s;
+  try { local.set('quiz-' + ui.deckKa, JSON.parse(JSON.stringify(s))); } catch(e) {}
+}
+function quizRestore(){
+  const s = quizMem[ui.ka] || local.get('quiz-' + ui.ka);
+  if (!s || !Array.isArray(s.deck) || !s.deck.length || !(s.idx < s.deck.length)) return false;
+  ui.deckKa = ui.ka; ui.qTopic = s.qTopic || 'all'; ui.deck = s.deck; ui.idx = s.idx;
+  ui.session = s.session || { n:0, sum:0 }; ui.summaryDone = !!s.summaryDone;
+  ui.qlog = Array.isArray(s.qlog) ? s.qlog : []; ui.front = Math.max(s.front || 0, s.idx); ui.draft = s.draft || null; ui.qlogDeck = ui.deck;
+  const c = s.cur || {};
+  ui.answered = !!c.answered; ui.sel = c.sel != null ? c.sel : null; ui.resp = Object.assign({}, c.resp || {}); ui.freeRes = c.freeRes || null; ui.lastScore = c.lastScore || 0; ui.anim = false;
+  return true;
+}
+function quizFor(topic){
+  if (ui.deckKa === ui.ka && ui.qTopic === topic && ui.deck.length && ui.idx < ui.deck.length) return;
+  if (quizRestore() && ui.qTopic === topic) return;
+  ui.qTopic = topic; startDeck();
+}
 function hasCalc(kid){ return topicsOf(kid).some(t => t.calcKind); }
 function renderQuiz(){
   if (ui.qlogDeck !== ui.deck) { ui.qlog = []; ui.front = ui.idx; ui.qlogDeck = ui.deck; ui.draft = null; }
@@ -3035,6 +3254,7 @@ function renderQuiz(){
     ${card}`;
   ui.anim = false;
   qNavInject();
+  quizKeep();
   if (total && ui.idx >= total && !ui.summaryDone) { ui.summaryDone = true; if (n && sum / n >= .85) setTimeout(burst, 120); }
 }
 function genTarget(){
@@ -3057,7 +3277,7 @@ function summaryCard(){
     <p>${q >= .85 ? 'Diese Runde hast du richtig gut gemacht.' : q >= .6 ? 'Noch eine Runde, dann sitzt es.' : 'Lies die Lernseite noch einmal und versuch es dann wieder.'}</p>
     <div class="row-actions"><button class="btn" data-restart>Noch eine Runde</button><button class="btn ghost" data-gen ${ui.genBusy ? 'disabled' : ''}>${I.spark}${ui.genBusy ? 'Claude schreibt …' : '5 neue Fragen'}</button><button class="btn ghost" data-view-go="home">Zur Übersicht</button></div></div>`;
 }
-function metaLine(q, i, n){ const t = topicOf(ui.ka, q.topic); return `<div class="qmeta"><span class="qtopic">${esc(t ? t.title : '')}</span>${q.local ? '<span class="newtag">Zufallsaufgabe</span>' : q.gen ? '<span class="newtag">von Claude</span>' : ''}${ui.view === 'quiz' && i < (ui.front || 0) ? '<span class="newtag rev-tag">Rückblick</span>' : ''}<span class="qcount">${i + 1} / ${n}</span></div>`; }
+function metaLine(q, i, n){ const t = topicOf(ui.ka, q.topic); return `<div class="qmeta"><span class="qtopic">${esc(t ? t.title : '')}</span>${q.local ? '<span class="newtag">Zufallsaufgabe</span>' : q.gen && window.claude && window.claude.use ? '<span class="newtag">von Claude</span>' : ''}${ui.view === 'quiz' && i < (ui.front || 0) ? '<span class="newtag rev-tag">Rückblick</span>' : ''}<span class="qcount">${i + 1} / ${n}</span></div>`; }
 function questionCard(q){ const n = ui.deck.length; return q.t === 'mc' ? mcCard(q, n) : q.t === 'free' ? freeCard(q, n) : calcCard(q, n); }
 
 function codeBlock(q){ return q && q.code ? `<pre class="code">${esc(q.code)}</pre>` : ''; }
@@ -3089,9 +3309,10 @@ function freeCard(q, n){
     inCard = `<div class="feedback"><b>Musterlösung</b>${esc(q.m)}</div>`;
     bar = `<div class="verdict neutral"><b>Wie gut war deine Antwort?</b></div><div class="three"><button class="btn small" data-self="1">Richtig</button><button class="btn small ghost" data-self=".5">Teilweise</button><button class="btn small ghost" data-self="0">Falsch</button></div>`;
   } else bar = `<button class="btn big" data-checkfree>${ui.sample ? 'Von Claude bewerten lassen' : 'Musterlösung zeigen'}</button>`;
+  const selfMode = ui.answered && !r && !ui.grading;
   return `<div class="glass qcard">${metaLine(q, ui.idx, n)}<p class="qkind">Freie Antwort</p><p class="qtext">${esc(q.q)}</p>${codeBlock(q)}${hintUI()}
     <textarea class="free" data-f="text" ${ui.answered || ui.grading ? 'readonly' : ''} aria-label="Deine Antwort" placeholder="Schreib deine Antwort in ganzen Sätzen.">${esc(ui.resp.text || '')}</textarea>${inCard}</div>
-    <div class="glass action-bar">${bar}</div>`;
+    <div class="glass action-bar${selfMode ? ' flow' : ''}">${bar}</div>`;
 }
 function describeTask(task){
   const p = task.p, g = [];
@@ -3192,10 +3413,10 @@ function localNew(){
   const take = fresh.slice(0, 5 - nCalc);
   const calcs = []; for (let i = 0; i < nCalc; i++) calcs.push(randomCalc(t));
   const added = shuffle(take.concat(calcs));
-  if (!added.length) { ui.genMsg = 'Alle eingebauten Fragen zu „' + t.title + '“ hast du schon. Ganz neue gibt es, wenn du die App in Claude öffnest.'; render(); return; }
+  if (!added.length) { ui.genMsg = 'Alle eingebauten Fragen zu „' + t.title + '“ hast du schon.'; render(); return; }
   if (take.length) { p.bank = (p.bank || []).concat(take.map(q => q.id)); persist('prog-' + kid, p); }
   if (calcs.length) { const c = C[kid]; c.gen = c.gen.filter(q => !q.local).concat(c.gen.filter(q => q.local).slice(-25), calcs); capContent(c); persist('ka-' + kid, c); }
-  ui.deck = added.concat(ui.deck.slice(Math.min(ui.idx, ui.deck.length)));
+  ui.deck = added.concat(ui.deck.slice(Math.min(ui.idx, ui.deck.length))).slice(0, QUIZ_N);
   ui.idx = 0; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null;
   const left = fresh.length - take.length;
   ui.genMsg = added.length + ' neue Aufgaben stehen vorne.' + (a.builtin ? (left > 0 ? ' Noch ' + left + ' eingebaute Fragen zu diesem Thema.' : t.calcKind ? ' Ab jetzt gibt es hier nur noch Zufallsrechnungen.' : ' Das waren die letzten eingebauten Fragen zu diesem Thema.') : '');
@@ -3221,7 +3442,7 @@ Prüfe jede Zahl doppelt. Wiederhole diese vorhandenen Aufgaben nicht: ${existin
     if (!added.length) ui.genMsg = 'Claude hat keine brauchbaren Aufgaben geliefert. Probier es noch einmal.';
     else {
       const c = C[kid]; c.gen = c.gen.concat(added); capContent(c); persist('ka-' + kid, c);
-      ui.deck = shuffle(added).concat(ui.deck.slice(Math.min(ui.idx, ui.deck.length)));
+      ui.deck = shuffle(added).concat(ui.deck.slice(Math.min(ui.idx, ui.deck.length))).slice(0, QUIZ_N);
       ui.idx = 0; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null;
       ui.genMsg = added.length + ' neue Aufgaben stehen jetzt vorne.';
     }
@@ -3255,7 +3476,7 @@ function renderExam(){
       <p class="sub">Ohne Zeitlimit. Ergebnisse siehst du erst am Ende, benotet nach IHK-Schlüssel.</p>
       <div class="glass pad"><div class="form">
         <label>Anzahl Aufgaben<select id="ex-n">${[10, 15, 20, 30].map(x => `<option ${x === ex.n ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
-        <p class="hint" style="margin:0">${avail} Aufgaben verfügbar${avail < ex.n ? ', also werden alle genommen' : ''}. Multiple Choice 1 Punkt, Rechnen und freie Antworten 2 Punkte.${ui.sample ? '' : ' Freie Antworten gibt es nur in Claude.'}</p>
+        <p class="hint" style="margin:0">${avail} Aufgaben verfügbar${avail < ex.n ? ', also werden alle genommen' : ''}. Multiple Choice 1 Punkt, Rechnen und freie Antworten 2 Punkte.</p>
         <button class="btn big" data-exstart ${avail ? '' : 'disabled'}>${I.cap} Prüfung starten</button>
       </div></div>
       <h2 class="group-title">Notenschlüssel</h2>
@@ -3340,6 +3561,7 @@ Antworte nur mit einem JSON-Array mit genau ${todo.length} Einträgen in derselb
 }
 
 /* ---------- Ereignisse ---------- */
+document.getElementById('setfab').addEventListener('click', () => { if (ui.exam && ui.exam.phase === 'run') examStore(); go('settings'); });
 document.querySelector('nav.tabs').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (!b || b.disabled) return; if (ui.exam && ui.exam.phase === 'run' && b.dataset.view !== 'exam') examStore(); go(b.dataset.view); });
 $main.addEventListener('change', e => {
   const t = e.target;
@@ -3388,6 +3610,7 @@ $main.addEventListener('click', async e => {
   else if (d.fb) fbAction(d.fb);
   else if ('fblogout' in d) fbLogout();
   else if ('backup' in d) saveBackup();
+  else if ('tour' in d) openTour(0);
   else if ('restorebtn' in d) { const inp = $main.querySelector('[data-restore]'); if (inp) inp.click(); }
   else if ('copyprompt' in d) {
     const txt = importPrompt(); let done = false;
@@ -3396,8 +3619,8 @@ $main.addEventListener('click', async e => {
     toast(done ? 'Prompt kopiert. Füge ihn jetzt in der KI ein.' : 'Markiere den Text im Feld und kopiere ihn.');
   }
   else if (d.read) { ui.kb = d.read; go('kb'); }
-  else if (d.practice) { ui.qTopic = d.practice; startDeck(); go('quiz'); }
-  else if (d.next) { if (d.next === 'read') { ui.kb = d.id; go('kb'); } else if (d.next === 'exam') go('exam'); else { ui.qTopic = d.id; startDeck(); go('quiz'); } }
+  else if (d.practice) { quizFor(d.practice); go('quiz'); }
+  else if (d.next) { if (d.next === 'read') { ui.kb = d.id; go('kb'); } else if (d.next === 'exam') go('exam'); else { quizFor(d.id); go('quiz'); } }
   else if ('goexam' in d) go('exam');
   else if (d.kb) { if (d.kb !== ui.kb) { ui.alt = null; switchKb(d.kb); } }
   else if (d.goto) { const h = document.getElementById(d.goto); if (h) h.scrollIntoView({ behavior:RM() ? 'auto' : 'smooth', block:'start' }); t.blur(); }
@@ -3435,7 +3658,7 @@ $main.addEventListener('click', async e => {
   else if ('checkfree' in d) {
     const q = ui.deck[ui.idx], text = String(ui.resp.text || '').trim();
     if (!text) { const ta = $main.querySelector('textarea.free'); if (ta) ta.focus(); return; }
-    if (!ui.sample) { ui.answered = true; ui.freeRes = null; render(); return; }
+    if (!ui.sample) { ui.answered = true; ui.freeRes = null; render(); const fbk = $main.querySelector('.qcard .feedback'); if (fbk) fbk.scrollIntoView({ block:'center', behavior:RM() ? 'auto' : 'smooth' }); return; }
     ui.grading = true; render();
     try { const r = await gradeFree(q, text); ui.freeRes = r; ui.answered = true; ui.session.n++; ui.session.sum += r.score; record(q.topic, r.score); afterCheck(r.score); qSave(); }
     catch(err) { toast(errText(err) || 'Die Bewertung hat nicht geklappt.'); }
