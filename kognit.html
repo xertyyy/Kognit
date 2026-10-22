@@ -2516,9 +2516,9 @@ function renderList(){
       <div class="glass list">${fb.user ? `<div class="row"><span class="row-title">Angemeldet als ${esc(fb.user.email || 'Google-Konto')}</span></div>
         <button class="row add" data-fblogout><span class="add-ic">←</span><span class="row-title">Abmelden</span></button>` : `<button class="row add" data-view-go="login"><span class="add-ic">→</span><span class="row-title">Anmelden oder Konto erstellen</span></button>`}</div>
       <p class="footnote">${fb.user ? 'Dein Fortschritt wird in deinem Konto gespeichert.' : 'Mit Konto ist dein Fortschritt auf allen Geräten da.'}</p></section>
-    <section><h2 class="group-title">Sicherung</h2>
-      <div class="glass list"><button class="row add" data-backup><span class="add-ic">↓</span><span class="row-title">Sicherung speichern</span></button>
-        <button class="row add" data-restorebtn><span class="add-ic">↑</span><span class="row-title">Sicherung laden</span></button>
+    <section><h2 class="group-title">Lernstand</h2>
+      <div class="glass list"><button class="row add" data-backup><span class="add-ic">↓</span><span class="row-title">Lernstand herunterladen</span></button>
+        <button class="row add" data-restorebtn><span class="add-ic">↑</span><span class="row-title">Lernstand hochladen</span></button>
         <input type="file" accept=".json,application/json" data-restore hidden></div>
       <p class="footnote">Speichert alle Fächer, deinen Stoff und deinen Fortschritt als Datei. So nimmst du alles auf ein anderes Gerät mit. <button class="linklike" data-view-go="help">So geht’s</button></p></section>` : ''}
     <p class="footnote" id="syncline"></p>`;
@@ -2646,16 +2646,16 @@ function saveBackup(){
   M.arbeiten.forEach(a => { ensure(a.id); ka[a.id] = C[a.id]; prog[a.id] = P[a.id]; });
   const blob = new Blob([JSON.stringify({ app:'kognit', v:1, saved:new Date().toISOString(), meta:M, ka, prog })], { type:'application/json' });
   const url = URL.createObjectURL(blob), a = document.createElement('a');
-  a.href = url; a.download = 'kognit-sicherung-' + dayKey() + '.json';
+  a.href = url; a.download = 'kognit-lernstand-' + dayKey() + '.json';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
-  toast('Sicherung gespeichert. Du findest sie in deinen Downloads.');
+  toast('Lernstand heruntergeladen. Du findest die Datei in deinen Downloads.');
 }
 async function loadBackup(file){
   let d = null;
   try { d = JSON.parse(await file.text()); } catch(e) {}
-  if (!d || d.app !== 'kognit' || !d.meta || !Array.isArray(d.meta.arbeiten) || !Array.isArray(d.meta.faecher)) { toast('Das ist keine Kognit-Sicherung.'); return; }
-  if (!(await dialog('Sicherung laden? Dein aktueller Stand auf diesem Gerät wird dabei ersetzt.', { ok:'Laden' }))) return;
+  if (!d || d.app !== 'kognit' || !d.meta || !Array.isArray(d.meta.arbeiten) || !Array.isArray(d.meta.faecher)) { toast('Das ist keine Kognit-Lernstand-Datei.'); return; }
+  if (!(await dialog('Lernstand hochladen? Dein aktueller Stand auf diesem Gerät wird dabei ersetzt.', { ok:'Hochladen' }))) return;
   const ka = d.ka || {}, prog = d.prog || {};
   M = d.meta;
   for (const a of M.arbeiten) {
@@ -2670,7 +2670,7 @@ async function loadBackup(file){
   persist('meta', M);
   ui.ka = null; ui.deck = []; ui.exam = null; ui.alt = null; ui.kb = null;
   go('list');
-  toast('Sicherung geladen.');
+  toast('Lernstand hochgeladen.');
 }
 
 /* ---------- Anleitung ---------- */
@@ -2688,23 +2688,23 @@ function renderHelp(){
         <li><b>Fokus-Timer:</b> lernen in Etappen mit Pausen.</li>
       </ul>
       <h3>Wo dein Fortschritt gespeichert wird</h3>
-      <p>${fb.user ? 'Du bist angemeldet. Dein Fortschritt wird in deinem Konto gespeichert und ist auf jedem Gerät da, auf dem du dich anmeldest.' : cloud ? 'Du nutzt die App in Claude. Dein Fortschritt wird in deinem Konto gespeichert und ist auf allen deinen Geräten da.' : (guestMode ? 'Du nutzt die App als Gast. Dabei wird nichts gespeichert: Wenn du die Seite schließt oder neu lädst, ist dein Fortschritt weg. Melde dich unter „Fächer“ bei „Konto“ an, mit Google oder mit E-Mail und Passwort. Dann wird alles gespeichert und ist auf jedem Gerät da. Was du als Gast schon gelernt hast, wird beim Anmelden übernommen.' : 'Ohne Konto wird dein Fortschritt automatisch gespeichert, aber nur in diesem Browser auf diesem Gerät. Er bleibt da, wenn du die App morgen wieder öffnest. Weg ist er im privaten Modus, wenn du die Browserdaten löschst oder wenn du ein anderes Gerät nimmst. Am einfachsten meldest du dich unter „Fächer“ bei „Konto“ an, mit Google oder mit E-Mail und Passwort. Dann ist alles auf jedem Gerät da. Ohne Konto hilft dir die Sicherung.')}</p>
-      ${!(window.claude && window.claude.use) ? `<h3>Fortschritt sichern</h3>
-      <p>Mach ab und zu eine Sicherung, vor allem bevor du das Gerät wechselst.</p>
-      <p><b>Sicherung speichern</b></p>
+      <p>${fb.user ? 'Du bist angemeldet. Dein Fortschritt wird in deinem Konto gespeichert und ist auf jedem Gerät da, auf dem du dich anmeldest.' : cloud ? 'Du nutzt die App in Claude. Dein Fortschritt wird in deinem Konto gespeichert und ist auf allen deinen Geräten da.' : (guestMode ? 'Du nutzt die App als Gast. Dabei wird nichts gespeichert: Wenn du die Seite schließt oder neu lädst, ist dein Fortschritt weg. Melde dich unter „Fächer“ bei „Konto“ an, mit Google oder mit E-Mail und Passwort. Dann wird alles gespeichert und ist auf jedem Gerät da. Was du als Gast schon gelernt hast, wird beim Anmelden übernommen.' : 'Ohne Konto wird dein Fortschritt automatisch gespeichert, aber nur in diesem Browser auf diesem Gerät. Er bleibt da, wenn du die App morgen wieder öffnest. Weg ist er im privaten Modus, wenn du die Browserdaten löschst oder wenn du ein anderes Gerät nimmst. Am einfachsten meldest du dich unter „Fächer“ bei „Konto“ an, mit Google oder mit E-Mail und Passwort. Dann ist alles auf jedem Gerät da. Ohne Konto hilft dir „Lernstand herunterladen“.')}</p>
+      ${!(window.claude && window.claude.use) ? `<h3>Lernstand herunterladen und hochladen</h3>
+      <p>Lade deinen Lernstand ab und zu herunter, vor allem bevor du das Gerät wechselst oder wenn du als Gast lernst.</p>
+      <p><b>Lernstand herunterladen</b></p>
       <ol>
-        <li>Tippe auf „Fächer“ und scroll nach unten zu „Sicherung“.</li>
-        <li>Tippe auf „Sicherung speichern“.</li>
-        <li>Die Datei „kognit-sicherung-….json“ landet in deinen Downloads. Am iPhone findest du sie in der Dateien-App unter „Downloads“.</li>
+        <li>Tippe auf „Fächer“ und scroll nach unten zu „Lernstand“.</li>
+        <li>Tippe auf „Lernstand herunterladen“.</li>
+        <li>Die Datei „kognit-lernstand-….json“ landet in deinen Downloads. Am iPhone findest du sie in der Dateien-App unter „Downloads“.</li>
         <li>Schick sie dir per Mail oder leg sie in deine Cloud. Dann kommst du von jedem Gerät aus dran.</li>
       </ol>
-      <p><b>Sicherung laden</b></p>
+      <p><b>Lernstand hochladen</b></p>
       <ol>
         <li>Öffne die App auf dem Gerät, auf dem du weitermachen willst, und tippe auf „Fächer“.</li>
-        <li>Tippe unter „Sicherung“ auf „Sicherung laden“ und wähl die Datei aus.</li>
-        <li>Bestätige mit „Laden“. Achtung: Der Stand, der auf diesem Gerät war, wird dabei ersetzt.</li>
+        <li>Tippe unter „Lernstand“ auf „Lernstand hochladen“ und wähl die Datei aus.</li>
+        <li>Bestätige mit „Hochladen“. Achtung: Der Stand, der auf diesem Gerät war, wird dabei ersetzt.</li>
       </ol>
-      <div class="tip"><b>iPhone-Tipp:</b> Safari löscht die Daten, wenn du die Seite etwa 7 Tage nicht öffnest. So verhinderst du das: Link in Safari öffnen, auf das Teilen-Symbol (Quadrat mit Pfeil) tippen, dann „Zum Home-Bildschirm“ und „Hinzufügen“. Öffne die App ab jetzt nur noch über das neue Symbol. Hast du in Safari schon Fortschritt, speicherst du dort vorher eine Sicherung und lädst sie danach im App-Symbol.</div>` : ''}
+      <div class="tip"><b>iPhone-Tipp:</b> Safari löscht die Daten, wenn du die Seite etwa 7 Tage nicht öffnest. So verhinderst du das: Link in Safari öffnen, auf das Teilen-Symbol (Quadrat mit Pfeil) tippen, dann „Zum Home-Bildschirm“ und „Hinzufügen“. Öffne die App ab jetzt nur noch über das neue Symbol. Hast du in Safari schon Fortschritt, speicherst du dort vorher deinen Lernstand und lädst ihn danach im App-Symbol hoch.</div>` : ''}
       <h3>Eigenen Lernstoff hochladen</h3>
       <ol>
         <li>Tippe auf „Fächer“. Leg ein neues Fach an oder nimm ein vorhandenes.</li>
