@@ -1694,8 +1694,98 @@ async function pullAll(first){
     }
   }
 }
+/* ---------- Login für die selbst gehostete Version (Firebase) ---------- */
+const FB_CONFIG = { apiKey:'AIzaSyD-edtbziolCbLTwGRabP6BSxjSuGTJcCY', authDomain:'kognit-cb4f4.firebaseapp.com', projectId:'kognit-cb4f4', storageBucket:'kognit-cb4f4.firebasestorage.app', messagingSenderId:'393794257875', appId:'1:393794257875:web:01ac82084d25cc9310e526' };
+const FB_V = '10.12.2';
+const fb = { ready:false, failed:false, user:null, auth:null, fs:null, offline:false, busy:false, err:'' };
+function fbDb(){ return { doc(path){ const r = fb.fs.doc(path); return {
+  get: async () => { try { const s = await r.get({ source:'server' }); return { exists:s.exists, data:() => s.exists ? JSON.parse(s.data().j) : null }; } catch(e) { fb.offline = true; throw e; } },
+  set: o => fb.offline ? Promise.reject(new Error('offline')) : r.set({ j:JSON.stringify(o), u:o.updated || 0 })
+}; } }; }
+function mergeMeta(rm){
+  if (!rm || !Array.isArray(rm.arbeiten) || !Array.isArray(rm.faecher)) return;
+  const newer = (rm.updated || 0) >= (M.updated || 0) ? rm : M, older = newer === rm ? M : rm;
+  const out = JSON.parse(JSON.stringify(newer));
+  for (const f of older.faecher || []) if (!out.faecher.some(x => x.id === f.id)) out.faecher.push(f);
+  for (const a of older.arbeiten || []) if (!out.arbeiten.some(x => x.id === a.id)) out.arbeiten.push(a);
+  if (out.arbeiten.length !== newer.arbeiten.length || out.faecher.length !== newer.faecher.length) out.updated = Date.now();
+  M = out; local.set('meta', M);
+}
+async function fbSync(first){
+  if (!fb.user) return;
+  fb.offline = false; syncState = 'connecting'; renderSync();
+  db = fbDb(); base = 'users/' + fb.user.uid + '/data/';
+  try {
+    if (first) { const rm = await remoteGet('meta'); if (fb.offline) throw new Error('offline'); if (rm) mergeMeta(rm); }
+    await pullAll(false);
+    if (fb.offline) throw new Error('offline');
+    syncState = 'cloud'; local.set('fbuid', fb.user.uid);
+  } catch(e) { syncState = 'local'; }
+  if (ui.ka && !ka(ui.ka)) { ui.ka = null; ui.view = 'list'; }
+  if (!ui.build && !(ui.exam && ui.exam.phase === 'run')) render(); else renderSync();
+}
+async function fbStart(){
+  try {
+    for (const p of ['app', 'auth', 'firestore']) await loadScript('https://www.gstatic.com/firebasejs/' + FB_V + '/firebase-' + p + '-compat.js');
+    firebase.initializeApp(FB_CONFIG);
+    fb.auth = firebase.auth(); fb.auth.languageCode = 'de'; fb.fs = firebase.firestore(); fb.ready = true;
+    try { await fb.auth.getRedirectResult(); } catch(e) { fb.err = fbErr(e); }
+    fb.auth.onAuthStateChanged(async u => {
+      fb.user = u || null;
+      if (u) { await fbSync(local.get('fbuid') !== u.uid); if (ui.view === 'login') go('list'); }
+      else { db = null; base = null; syncState = 'local'; if (ui.view === 'list' || ui.view === 'login') render(); else renderSync(); }
+    });
+  } catch(e) { fb.failed = true; }
+  if (ui.view === 'login') render();
+}
+function fbErr(e){
+  const m = { 'auth/invalid-credential':'E-Mail oder Passwort stimmt nicht.', 'auth/wrong-password':'E-Mail oder Passwort stimmt nicht.', 'auth/user-not-found':'E-Mail oder Passwort stimmt nicht.', 'auth/invalid-email':'Die E-Mail-Adresse ist ungültig.', 'auth/missing-email':'Gib deine E-Mail-Adresse ein.', 'auth/email-already-in-use':'Mit dieser E-Mail gibt es schon ein Konto. Melde dich an.', 'auth/weak-password':'Das Passwort braucht mindestens 6 Zeichen.', 'auth/missing-password':'Gib ein Passwort ein.', 'auth/too-many-requests':'Zu viele Versuche. Warte kurz und versuch es dann noch einmal.', 'auth/network-request-failed':'Keine Internetverbindung.', 'auth/popup-closed-by-user':'', 'auth/cancelled-popup-request':'', 'auth/unauthorized-domain':'Diese Seite ist in Firebase noch nicht freigegeben (Autorisierte Domains).', 'auth/operation-not-allowed':'Diese Anmeldeart ist in Firebase noch nicht eingeschaltet.', 'auth/account-exists-with-different-credential':'Diese E-Mail gehört schon zu einer anderen Anmeldeart.' };
+  const c = (e && e.code) || ''; return c in m ? m[c] : 'Das hat nicht geklappt. Versuch es noch einmal.';
+}
+async function fbAction(kind){
+  if (!fb.ready || fb.busy) return;
+  const f = ui.login || (ui.login = { email:'', pw:'' }), email = (f.email || '').trim(), pw = f.pw || '';
+  fb.busy = true; fb.err = ''; render();
+  try {
+    if (kind === 'google') {
+      const p = new firebase.auth.GoogleAuthProvider();
+      try { await fb.auth.signInWithPopup(p); }
+      catch(e) { if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) await fb.auth.signInWithRedirect(p); else throw e; }
+    } else if (kind === 'in') await fb.auth.signInWithEmailAndPassword(email, pw);
+    else if (kind === 'up') await fb.auth.createUserWithEmailAndPassword(email, pw);
+    else if (kind === 'reset') { if (!email) fb.err = 'Gib oben zuerst deine E-Mail-Adresse ein.'; else { await fb.auth.sendPasswordResetEmail(email); toast('Falls es ein Konto gibt, kommt gleich eine E-Mail zum Zurücksetzen.'); } }
+  } catch(e) { fb.err = fbErr(e); }
+  fb.busy = false; if (ui.view === 'login') render();
+}
+async function fbLogout(){
+  if (!(await dialog('Abmelden? Deine Daten bleiben in deinem Konto. Von diesem Gerät werden sie entfernt.', { ok:'Abmelden' }))) return;
+  syncState = 'connecting'; renderSync();
+  await new Promise(r => setTimeout(r, 900));
+  try { await Promise.allSettled(Object.values(queues)); } catch(e) {}
+  try { await fb.auth.signOut(); } catch(e) {}
+  try { Object.keys(localStorage).filter(k => k.startsWith(LKEY('')) && k !== LKEY('timercfg')).forEach(k => localStorage.removeItem(k)); } catch(e) {}
+  location.reload();
+}
+function renderLogin(){
+  const f = ui.login || (ui.login = { email:'', pw:'' }), off = fb.busy || !fb.ready ? 'disabled' : '';
+  $main.innerHTML = `
+    <div class="lt"><h1>Anmelden</h1></div>
+    <div class="glass pad"><div class="form">
+      <p class="hint" style="margin:0">Mit einem Konto ist dein Fortschritt auf allen Geräten da. Ohne Konto bleibt er nur in diesem Browser.</p>
+      ${fb.failed ? '<div class="tip">Die Anmeldung konnte nicht geladen werden. Prüf deine Internetverbindung und lade die Seite neu.</div>' : !fb.ready ? '<p class="hint" style="margin:0">Anmeldung wird geladen …</p>' : ''}
+      <button class="btn" data-fb="google" ${off}>Mit Google anmelden</button>
+      <p class="hint" style="margin:4px 0 0;text-align:center">oder mit E-Mail</p>
+      <label>E-Mail<input type="email" autocomplete="email" data-lf="email" value="${esc(f.email || '')}"></label>
+      <label>Passwort<input type="password" autocomplete="current-password" data-lf="pw" value="${esc(f.pw || '')}"></label>
+      ${fb.err ? `<div class="tip">${esc(fb.err)}</div>` : ''}
+      <div class="row-actions" style="margin-top:0"><button class="btn" data-fb="in" ${off}>Anmelden</button><button class="btn ghost" data-fb="up" ${off}>Konto erstellen</button></div>
+      <button class="linklike" data-fb="reset" ${off}>Passwort vergessen?</button>
+      <p class="hint" style="margin:0">Deine E-Mail-Adresse und dein Lernstand werden bei Google Firebase gespeichert. Andere Nutzer sehen sie nicht, der Betreiber der App könnte sie technisch einsehen.</p>
+    </div></div>`;
+}
+
 async function connect(){
-  if (!window.claude || !window.claude.use) { syncState = 'local'; ui.sample = null; render(); return; }
+  if (!window.claude || !window.claude.use) { syncState = 'local'; ui.sample = null; render(); fbStart(); return; }
   try {
     const [d, u] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
     const id = u ? await u.id() : null;
@@ -1708,8 +1798,9 @@ async function connect(){
   render();
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && base && !ui.build && !(ui.exam && ui.exam.phase === 'run')) pullAll(false).then(() => { if (ui.ka && !ka(ui.ka)) { ui.ka = null; ui.view = 'list'; } render(); });
+  if (document.visibilityState === 'visible' && base && !ui.build && !(ui.exam && ui.exam.phase === 'run')) { if (fb.user) fbSync(false); else pullAll(false).then(() => { if (ui.ka && !ka(ui.ka)) { ui.ka = null; ui.view = 'list'; } render(); }); }
 });
+window.addEventListener('online', () => { if (fb.user && syncState !== 'cloud') fbSync(false); });
 
 /* ---------- Zustand der Oberfläche ---------- */
 const savedUi = local.get('ui');
@@ -2290,7 +2381,7 @@ function render(){
   const a = ka(ui.ka);
   document.querySelectorAll('nav.tabs button[data-view]').forEach(b => {
     const v = b.dataset.view;
-    b.setAttribute('aria-current', v === ui.view || (v === 'list' && (ui.view === 'new' || ui.view === 'help')) ? 'page' : 'false');
+    b.setAttribute('aria-current', v === ui.view || (v === 'list' && (ui.view === 'new' || ui.view === 'help' || ui.view === 'login')) ? 'page' : 'false');
     b.disabled = v !== 'list' && !a;
   });
   const cd = document.getElementById('countdown');
@@ -2300,6 +2391,7 @@ function render(){
   if (ui.view === 'list') renderList();
   else if (ui.view === 'new') renderNew();
   else if (ui.view === 'help') renderHelp();
+  else if (ui.view === 'login') renderLogin();
   else if (!a) { ui.view = 'list'; renderList(); }
   else if (ui.view === 'home') renderHome();
   else if (ui.view === 'kb') renderKb();
@@ -2310,7 +2402,7 @@ function render(){
 }
 function renderSync(){
   const el = document.getElementById('syncline');
-  if (el) el.textContent = syncState === 'connecting' ? 'Speicherort wird geprüft …' : syncState === 'cloud' ? 'Fortschritt wird auf allen deinen Geräten gespeichert.' : 'Fortschritt wird nur auf diesem Gerät gespeichert. In der Claude-App wird er geräteübergreifend gesichert.';
+  if (el) el.textContent = syncState === 'connecting' ? 'Speicherort wird geprüft …' : syncState === 'cloud' ? 'Fortschritt wird auf allen deinen Geräten gespeichert.' : 'Fortschritt wird nur auf diesem Gerät gespeichert. ' + (window.claude && window.claude.use ? 'In der Claude-App wird er geräteübergreifend gesichert.' : 'Melde dich unter „Konto“ an, damit er auf allen Geräten da ist.');
 }
 function go(view){
   const prevView = ui.view;
@@ -2355,7 +2447,11 @@ function renderList(){
     ${orphans.length ? `<section style="--fach:#8E8E93;--fach-rgb:142,142,147"><h2 class="group-title">Ohne Fach</h2><div class="glass list">${orphans.map(kaRow).join('')}</div></section>` : ''}
     <section><h2 class="group-title">Neues Fach</h2>
       <div class="glass list"><div class="row field"><input id="newfach" type="text" placeholder="z. B. Deutsch, WiSo, LF3" maxlength="60" aria-label="Name des neuen Fachs"><button class="btn small" data-addfach>Hinzufügen</button></div></div></section>
-    ${!(window.claude && window.claude.use) ? `<section><h2 class="group-title">Sicherung</h2>
+    ${!(window.claude && window.claude.use) ? `<section><h2 class="group-title">Konto</h2>
+      <div class="glass list">${fb.user ? `<div class="row"><span class="row-title">Angemeldet als ${esc(fb.user.email || 'Google-Konto')}</span></div>
+        <button class="row add" data-fblogout><span class="add-ic">←</span><span class="row-title">Abmelden</span></button>` : `<button class="row add" data-view-go="login"><span class="add-ic">→</span><span class="row-title">Anmelden oder Konto erstellen</span></button>`}</div>
+      <p class="footnote">${fb.user ? 'Dein Fortschritt wird in deinem Konto gespeichert.' : 'Mit Konto ist dein Fortschritt auf allen Geräten da.'}</p></section>
+    <section><h2 class="group-title">Sicherung</h2>
       <div class="glass list"><button class="row add" data-backup><span class="add-ic">↓</span><span class="row-title">Sicherung speichern</span></button>
         <button class="row add" data-restorebtn><span class="add-ic">↑</span><span class="row-title">Sicherung laden</span></button>
         <input type="file" accept=".json,application/json" data-restore hidden></div>
@@ -2527,7 +2623,7 @@ function renderHelp(){
         <li><b>Fokus-Timer:</b> lernen in Etappen mit Pausen.</li>
       </ul>
       <h3>Wo dein Fortschritt gespeichert wird</h3>
-      <p>${cloud ? 'Du nutzt die App in Claude. Dein Fortschritt wird in deinem Konto gespeichert und ist auf allen deinen Geräten da.' : 'Dein Fortschritt wird automatisch gespeichert, aber nur in diesem Browser auf diesem Gerät. Er bleibt da, wenn du die App morgen wieder öffnest. Weg ist er im privaten Modus, wenn du die Browserdaten löschst oder wenn du ein anderes Gerät nimmst. Deshalb gibt es die Sicherung.'}</p>
+      <p>${fb.user ? 'Du bist angemeldet. Dein Fortschritt wird in deinem Konto gespeichert und ist auf jedem Gerät da, auf dem du dich anmeldest.' : cloud ? 'Du nutzt die App in Claude. Dein Fortschritt wird in deinem Konto gespeichert und ist auf allen deinen Geräten da.' : 'Ohne Konto wird dein Fortschritt automatisch gespeichert, aber nur in diesem Browser auf diesem Gerät. Er bleibt da, wenn du die App morgen wieder öffnest. Weg ist er im privaten Modus, wenn du die Browserdaten löschst oder wenn du ein anderes Gerät nimmst. Am einfachsten meldest du dich unter „Fächer“ bei „Konto“ an, mit Google oder mit E-Mail und Passwort. Dann ist alles auf jedem Gerät da. Ohne Konto hilft dir die Sicherung.'}</p>
       ${!(window.claude && window.claude.use) ? `<h3>Fortschritt sichern</h3>
       <p>Mach ab und zu eine Sicherung, vor allem bevor du das Gerät wechselst.</p>
       <p><b>Sicherung speichern</b></p>
@@ -3191,6 +3287,7 @@ $main.addEventListener('input', e => {
   const t = e.target;
   if (t.matches('[data-f]')) { ui.resp[t.dataset.f] = t.value; }
   else if (t.matches('[data-ff]') && ui.form) ui.form[t.dataset.ff] = t.value;
+  else if (t.matches('[data-lf]')) (ui.login = ui.login || {})[t.dataset.lf] = t.value;
   else if (t.matches('[data-ex]')) examStore();
 });
 $main.addEventListener('toggle', e => { if (e.target.matches('details.settings')) ui.editOpen = e.target.open; }, true);
@@ -3222,6 +3319,8 @@ $main.addEventListener('click', async e => {
   else if ('cancelnew' in d) { ui.form = null; ui.build = null; go('list'); }
   else if ('build' in d) buildKa();
   else if ('importka' in d) importKa();
+  else if (d.fb) fbAction(d.fb);
+  else if ('fblogout' in d) fbLogout();
   else if ('backup' in d) saveBackup();
   else if ('restorebtn' in d) { const inp = $main.querySelector('[data-restore]'); if (inp) inp.click(); }
   else if ('copyprompt' in d) {
