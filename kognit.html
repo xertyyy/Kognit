@@ -389,7 +389,7 @@ input.bad{border-color:var(--red) !important;background:var(--red-t) !important}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabbar) + 28px + env(safe-area-inset-bottom,0px));z-index:40;max-width:calc(100% - 32px);padding:11px 18px;border-radius:999px;font-size:15px;font-weight:500;color:#FFFFFF;background:rgba(29,29,31,.86);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 10px 30px rgba(0,0,0,.25)}
 html.gated,html.gated body{overflow:hidden}
 html.gated #toast{z-index:1001}
-#gate{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;overflow-y:auto;padding:calc(20px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px));background:rgba(127,127,127,.12);background:color-mix(in srgb,var(--bg) 22%,transparent);-webkit-backdrop-filter:blur(5px) saturate(1.2);backdrop-filter:blur(5px) saturate(1.2);animation:gateIn .35s ease both}
+#gate,#classpick{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;overflow-y:auto;padding:calc(20px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px));background:rgba(127,127,127,.12);background:color-mix(in srgb,var(--bg) 22%,transparent);-webkit-backdrop-filter:blur(5px) saturate(1.2);backdrop-filter:blur(5px) saturate(1.2);animation:gateIn .35s ease both}
 @keyframes gateIn{from{opacity:0}to{opacity:1}}
 .gate-card{width:100%;max-width:400px;padding:28px 24px;border-radius:28px;border:1px solid var(--glass-edge);background:var(--glass-hi);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);box-shadow:0 30px 80px rgba(0,0,0,.28);animation:gateCard .5s cubic-bezier(.2,1.25,.3,1) both}
 @keyframes gateCard{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
@@ -406,6 +406,20 @@ html.gated #toast{z-index:1001}
 @media (prefers-reduced-motion: reduce){.gate-head .gate-title{animation:none}}
 .gate-head .gate-tag{margin:-2px 0 6px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--label2)}
 .gate-card .btn{width:100%}
+.board{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.board li{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(60px,110px) 46px;align-items:center;gap:8px;font-size:15px;color:var(--label)}
+.board li.me{font-weight:700}
+.board .bd-rank{text-align:center;font-weight:700;color:var(--label2);font-variant-numeric:tabular-nums}
+.board .bd-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board .bd-name small{font-weight:500;color:var(--label2)}
+.board .bd-bar{height:8px;border-radius:4px;background:var(--sep);overflow:hidden}
+.board .bd-bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--kg1),var(--kg3));transition:width .6s ease}
+.board .bd-val{text-align:right;font-variant-numeric:tabular-nums}
+.cc-board{padding:12px 16px 4px;border-top:1px solid var(--sep)}
+.cc-head{margin:0 0 10px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--label2)}
+.cc-head small{font-weight:500;text-transform:none;letter-spacing:0;margin-left:6px}
+.board-card{margin-bottom:6px}
+.admin-tag{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink);background:rgba(var(--acc-rgb),.14);padding:2px 8px;border-radius:999px;margin-left:8px;vertical-align:middle}
 html.touring,html.touring body{overflow:hidden}
 #tour{position:fixed;inset:0;z-index:1000}
 .tour-spot{position:fixed;pointer-events:none;box-shadow:0 0 0 200vmax rgba(0,0,0,.62),0 0 0 2px rgba(255,255,255,.85),0 0 28px 6px rgba(255,255,255,.18);transition:top .5s cubic-bezier(.2,1.1,.3,1),left .5s cubic-bezier(.2,1.1,.3,1),width .5s cubic-bezier(.2,1.1,.3,1),height .5s cubic-bezier(.2,1.1,.3,1),border-radius .5s}
@@ -1735,6 +1749,7 @@ const queues = {}, timers = {};
 function persist(key, obj){
   obj.updated = Date.now();
   local.set(key, obj);
+  try { if (fb.user && key === 'prog-' + classKaId()) pushMember(false); } catch(e) {}
   if (!base) return;
   clearTimeout(timers[key]);
   timers[key] = setTimeout(() => {
@@ -1831,7 +1846,7 @@ async function fbStart(){
     try { await fb.auth.getRedirectResult(); } catch(e) { fb.err = fbErr(e); }
     fb.auth.onAuthStateChanged(async u => {
       fb.user = u || null; gate.loading = false;
-      if (u) { guestMode = false; hideGate(); await fbSync(local.get('fbuid') !== u.uid); if (ui.view === 'login') go('settings'); }
+      if (u) { guestMode = false; await fbSync(local.get('fbuid') !== u.uid); hideGate(); if (ui.view === 'login') go('settings'); afterLogin(); }
       else { db = null; base = null; syncState = 'local'; if (!guestMode) paintGate(); if (ui.view === 'list' || ui.view === 'login') render(); else renderSync(); }
     });
   } catch(e) { fb.failed = true; gate.loading = false; paintGate(); }
@@ -1888,6 +1903,204 @@ function renderLogin(){
       ${loginFormHtml()}
       <p class="hint" style="margin:0">Deine E-Mail-Adresse und dein Lernstand werden bei Google Firebase gespeichert. Andere Nutzer sehen sie nicht, der Betreiber der App könnte sie technisch einsehen.</p>
     </div></div>`;
+}
+
+/* ---------- Klassen, nächste Klassenarbeit und Leaderboard (nur Website mit Konto) ---------- */
+const ADMIN_UID = '';
+const DEFAULT_CLASSES = [{ id:'efs225', name:'EFS 225' }];
+const cls = { list:DEFAULT_CLASSES.slice(), info:null, board:null, boardAt:0, loading:false, pushT:0, lastReady:null };
+function isAdmin(){ return !!(fb.user && ADMIN_UID && fb.user.uid === ADMIN_UID); }
+function myClass(){ return M.profile && M.profile.classId ? M.profile.classId : null; }
+function className(id){ const c = cls.list.find(x => x.id === id); return c ? c.name : (cls.info && cls.info.id === id && cls.info.name) || id; }
+function classKaId(){
+  const cid = myClass(), nx = cls.info && cls.info.id === cid ? cls.info.next : null;
+  if (!cid || !nx || !nx.id) return null;
+  return isAdmin() && ka(nx.id) && !ka(nx.id).classKa ? nx.id : 'c-' + cid + '-' + nx.id;
+}
+async function loadClassList(){
+  try {
+    const q = await fb.fs.collection('classes').get(), arr = [];
+    q.forEach(d => { const x = d.data() || {}; arr.push({ id:d.id, name:String(x.name || d.id).slice(0, 40) }); });
+    DEFAULT_CLASSES.forEach(c => { if (!arr.some(x => x.id === c.id)) arr.push(c); });
+    arr.sort((a, b) => a.name.localeCompare(b.name, 'de')); cls.list = arr;
+  } catch(e) {}
+}
+async function classSync(){
+  const cid = myClass();
+  if (!fb.user || !cid) { cls.info = null; cls.board = null; return; }
+  try {
+    const d = await fb.fs.doc('classes/' + cid).get();
+    const x = d.exists ? d.data() || {} : {};
+    cls.info = { id:cid, name:String(x.name || className(cid)), next:x.next && x.next.id ? x.next : null };
+    const nx = cls.info.next, kid = classKaId();
+    if (!nx || !kid) return;
+    if (kid !== nx.id) {
+      const fid = 'f-' + cid;
+      if (!fach(fid)) M.faecher.push({ id:fid, name:cls.info.name });
+      let a = ka(kid);
+      if (!a) { M.arbeiten.push({ id:kid, fachId:fid, title:String(nx.title || 'Klassenarbeit'), date:nx.date || '', time:nx.time || '', classKa:cid }); persist('meta', M); }
+      else if (a.title !== nx.title || (a.date || '') !== (nx.date || '') || (a.time || '') !== (nx.time || '')) { Object.assign(a, { title:String(nx.title || a.title), date:nx.date || '', time:nx.time || '' }); persist('meta', M); }
+      const st = ka(STARTER.ka.id);
+      if (st && st.id !== kid && st.title === nx.title) {
+        const sp = P[st.id] || local.get('prog-' + st.id);
+        const used = sp && ((sp.done && Object.keys(sp.done).length) || (sp.hist && Object.keys(sp.hist).length) || (sp.exams && sp.exams.length));
+        if (!used) {
+          M.arbeiten = M.arbeiten.filter(x => x.id !== st.id);
+          if (!M.arbeiten.some(x => x.fachId === st.fachId)) M.faecher = M.faecher.filter(f => f.id !== st.fachId);
+          persist('meta', M);
+        }
+      }
+      ensure(kid);
+      if (!(C[kid].topics || []).length || (C[kid].classVer || 0) < (nx.updated || 0)) {
+        const c = await fb.fs.doc('classes/' + cid + '/content/' + nx.id).get();
+        if (c.exists) {
+          const data = JSON.parse(c.data().j || '{}');
+          const topics = Array.isArray(data.topics) ? data.topics : [];
+          topics.forEach(t => { if (typeof t.html === 'string') t.html = sanitize(t.html); if (Array.isArray(t.alts)) t.alts = t.alts.filter(v => typeof v === 'string').map(v => sanitize(v)); });
+          C[kid] = Object.assign(blankContent(), { topics, gen:Array.isArray(data.gen) ? data.gen : [], info:String(data.info || ''), classVer:nx.updated || 0 });
+          persist('ka-' + kid, C[kid]);
+        }
+      }
+    }
+    pushMember(true);
+  } catch(e) { console.warn('Klasse konnte nicht geladen werden', e); }
+}
+function pushMember(now){
+  const cid = myClass(), kid = classKaId();
+  if (!fb.user || !cid || !kid || !M.profile || !cls.info || !cls.info.next) return;
+  clearTimeout(cls.pushT);
+  cls.pushT = setTimeout(() => {
+    const ready = readiness(kid);
+    if (now && cls.lastReady === ready) return;
+    cls.lastReady = ready;
+    fb.fs.doc('classes/' + cid + '/members/' + fb.user.uid).set({ name:String(M.profile.name || 'Unbekannt').slice(0, 30), ready, kaId:cls.info.next.id, updated:Date.now() })
+      .then(() => {
+        if (!cls.board) return;
+        let me = cls.board.find(r => r.uid === fb.user.uid);
+        if (me) me.ready = ready; else cls.board.push(me = { uid:fb.user.uid, name:String(M.profile.name || 'Unbekannt').slice(0, 30), ready });
+        cls.board.sort((a, b) => b.ready - a.ready || a.name.localeCompare(b.name, 'de'));
+        if (['list', 'home'].includes(ui.view) && !ui.build) render();
+      })
+      .catch(() => {});
+  }, now ? 0 : 1500);
+}
+async function loadBoard(){
+  const cid = myClass();
+  if (!fb.user || !cid || !cls.info || !cls.info.next) { cls.board = null; return; }
+  try {
+    const q = await fb.fs.collection('classes/' + cid + '/members').where('kaId', '==', cls.info.next.id).get(), arr = [];
+    q.forEach(d => { const x = d.data() || {}; arr.push({ uid:d.id, name:String(x.name || '?').slice(0, 30), ready:Math.max(0, Math.min(100, Math.round(+x.ready || 0))) }); });
+    arr.sort((a, b) => b.ready - a.ready || a.name.localeCompare(b.name, 'de'));
+    cls.board = arr;
+  } catch(e) { cls.board = cls.board || []; }
+  cls.boardAt = Date.now();
+}
+function classRefresh(){
+  if (!fb.user || !myClass() || cls.loading) return;
+  const want = ui.view === 'list' || ui.view === 'settings' || (ui.view === 'home' && ui.ka && ui.ka === classKaId());
+  if (!want || Date.now() - cls.boardAt < 60000) return;
+  cls.loading = true; cls.boardAt = Date.now();
+  classSync().then(loadBoard).finally(() => { cls.loading = false; if (['list', 'home', 'settings'].includes(ui.view)) render(); });
+}
+function boardHtml(limit){
+  const b = cls.board;
+  if (!b) return '<p class="hint" style="margin:0">Leaderboard wird geladen …</p>';
+  if (!b.length) return '<p class="hint" style="margin:0">Noch hat niemand geübt. Mach ein Quiz und sei die oder der Erste!</p>';
+  const me = fb.user && fb.user.uid;
+  let rows = limit ? b.slice(0, limit) : b.slice();
+  if (limit && !rows.some(r => r.uid === me)) { const mine = b.find(r => r.uid === me); if (mine) rows.push(mine); }
+  const medal = ['🥇', '🥈', '🥉'];
+  return `<ol class="board">${rows.map(r => { const rank = b.indexOf(r) + 1; return `<li class="${r.uid === me ? 'me' : ''}"><span class="bd-rank">${rank <= 3 ? medal[rank - 1] : rank + '.'}</span><span class="bd-name">${esc(r.name)}${r.uid === me ? ' <small>(du)</small>' : ''}</span><span class="bd-bar"><i style="width:${r.ready}%"></i></span><b class="bd-val">${r.ready} %</b></li>`; }).join('')}</ol>`;
+}
+function classCardHtml(){
+  const kid = classKaId(), a = kid && ka(kid);
+  if (!fb.user || !a || !cls.info) return '';
+  return `<section style="${fachStyle(a.fachId)}"><h2 class="group-title"><i class="fdot" aria-hidden="true"></i>Nächste Klassenarbeit · ${esc(cls.info.name)}</h2>
+    <div class="glass list classcard">${kaRow(a)}
+      <div class="cc-board"><p class="cc-head">Leaderboard <small>Bereit-% aus dem Quiz</small></p>${boardHtml(3)}</div>
+      <button class="row add" data-open="${a.id}"><span class="add-ic">→</span><span class="row-title">Ganzes Leaderboard ansehen</span></button></div></section>`;
+}
+function classSectionHtml(){
+  if (!fb.user) return '';
+  const cid = myClass();
+  return `<section><h2 class="group-title">Klasse</h2>
+    <div class="glass list"><button class="row add" data-classpick><span class="add-ic">🎓</span><span class="row-title">${cid ? esc(className(cid)) + ' · ' + esc((M.profile && M.profile.name) || '') : 'Klasse auswählen'}</span></button></div>
+    <p class="footnote">Dein Vorname und dein Bereit-% bei der nächsten Klassenarbeit sind für deine Klasse im Leaderboard sichtbar.<br>Nutzer-ID: <code>${esc(fb.user.uid)}</code></p></section>`;
+}
+function adminSectionHtml(){
+  if (!isAdmin()) return '';
+  const own = M.arbeiten.filter(a => !a.classKa);
+  const cur = cls.info && cls.info.next ? cls.info.next : null;
+  return `<section><h2 class="group-title">Klasse verwalten <small class="admin-tag">Admin</small></h2>
+    <div class="glass pad"><div class="form">
+      <label>Klasse<select id="ad-class">${cls.list.map(c => `<option value="${esc(c.id)}" ${c.id === myClass() ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+      <label>Nächste Klassenarbeit<select id="ad-ka">${own.map(a => `<option value="${esc(a.id)}" ${cur && cur.id === a.id ? 'selected' : ''}>${esc(a.title)}${fach(a.fachId) ? ' (' + esc(fach(a.fachId).name) + ')' : ''}</option>`).join('')}</select></label>
+      ${cur ? `<p class="hint" style="margin:0">Aktuell f\u00fcr ${esc(cls.info.name)}: <b>${esc(cur.title)}</b></p>` : ''}
+      <button class="btn" data-adpublish>F\u00fcr die Klasse ver\u00f6ffentlichen</button>
+      <p class="hint" style="margin:0">Alle in der Klasse bekommen diese Klassenarbeit mit Lernseiten und Fragen und sehen sie oben unter \u201eF\u00e4cher\u201c. Dein eigener Fortschritt wird nicht mitgeschickt. Wenn du die Klassenarbeit sp\u00e4ter \u00e4nderst, ver\u00f6ffentliche sie einfach noch einmal.</p>
+      <div class="row field" style="padding:0"><input id="ad-newclass" type="text" maxlength="40" placeholder="Neue Klasse, z. B. EFS 226" aria-label="Name der neuen Klasse"><button class="btn small" data-adnewclass>Anlegen</button></div>
+    </div></div></section>`;
+}
+async function adminPublish(){
+  if (!isAdmin()) return;
+  const cid = (document.getElementById('ad-class') || {}).value, kid = (document.getElementById('ad-ka') || {}).value, a = ka(kid);
+  if (!cid || !a) { toast('W\u00e4hl eine Klasse und eine Klassenarbeit aus.'); return; }
+  const name = className(cid);
+  if (!(await dialog(`\u201e${a.title}\u201c als n\u00e4chste Klassenarbeit f\u00fcr ${name} ver\u00f6ffentlichen?`, { ok:'Ver\u00f6ffentlichen' }))) return;
+  ensure(kid);
+  const payload = JSON.stringify({ topics:topicsOf(kid), gen:(C[kid] && C[kid].gen) || [], info:(C[kid] && C[kid].info) || '' });
+  if (payload.length > 900000) { toast('Diese Klassenarbeit ist zu gro\u00df zum Ver\u00f6ffentlichen.'); return; }
+  try {
+    const now = Date.now();
+    await fb.fs.doc('classes/' + cid + '/content/' + kid).set({ j:payload, updated:now });
+    await fb.fs.doc('classes/' + cid).set({ name, next:{ id:kid, title:a.title, date:a.date || '', time:a.time || '', updated:now } }, { merge:true });
+    toast('Ver\u00f6ffentlicht f\u00fcr ' + name + '.');
+    cls.boardAt = 0; if (cid === myClass()) { await classSync(); await loadBoard(); }
+    render();
+  } catch(e) { toast('Das hat nicht geklappt. Pr\u00fcf die Firestore-Regeln.'); }
+}
+async function adminNewClass(){
+  if (!isAdmin()) return;
+  const inp = document.getElementById('ad-newclass'), name = (inp && inp.value || '').trim().slice(0, 40);
+  const id = name.toLowerCase().replace(/\u00e4/g, 'ae').replace(/\u00f6/g, 'oe').replace(/\u00fc/g, 'ue').replace(/\u00df/g, 'ss').replace(/[^a-z0-9]+/g, '');
+  if (!name || !id) { toast('Gib einen Namen f\u00fcr die Klasse ein.'); return; }
+  if (cls.list.some(c => c.id === id)) { toast('Diese Klasse gibt es schon.'); return; }
+  try { await fb.fs.doc('classes/' + id).set({ name }, { merge:true }); await loadClassList(); toast('Klasse ' + name + ' angelegt.'); render(); }
+  catch(e) { toast('Das hat nicht geklappt. Pr\u00fcf die Firestore-Regeln.'); }
+}
+async function showClassPicker(then){
+  if (document.getElementById('classpick')) return;
+  await loadClassList();
+  const first = (M.profile && M.profile.name) || String((fb.user && fb.user.displayName) || '').trim().split(/\s+/)[0] || '';
+  const el = document.createElement('div');
+  el.id = 'classpick'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Klasse ausw\u00e4hlen');
+  el.innerHTML = `<div class="gate-card"><div class="form">
+    <div class="gate-head"><h1 class="gate-title">Deine Klasse</h1><p>W\u00e4hl deine Klasse aus. Dann siehst du die n\u00e4chste Klassenarbeit und das Leaderboard deiner Klasse.</p></div>
+    <label>Klasse<select id="cp-class">${cls.list.map(c => `<option value="${esc(c.id)}" ${myClass() === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}<option value="" ${M.profile && M.profile.asked && !myClass() ? 'selected' : ''}>Keine Klasse</option></select></label>
+    <label>Vorname<input id="cp-name" type="text" maxlength="30" autocomplete="given-name" value="${esc(first)}"></label>
+    <p class="gate-note">Dein Vorname und dein Bereit-% sind f\u00fcr deine Klasse im Leaderboard sichtbar. Du kannst das sp\u00e4ter im Profil \u00e4ndern.</p>
+    <button class="btn" data-cpsave>Weiter</button>
+  </div></div>`;
+  document.body.appendChild(el); document.documentElement.classList.add('gated');
+  el.addEventListener('click', async e => {
+    if (!e.target.closest('[data-cpsave]')) return;
+    const cid = document.getElementById('cp-class').value, name = document.getElementById('cp-name').value.trim().slice(0, 30);
+    if (cid && !name) { toast('Gib deinen Vornamen ein.'); return; }
+    const old = myClass();
+    M.profile = { classId:cid || null, name, asked:true }; persist('meta', M);
+    if (old && old !== cid && fb.user) fb.fs.doc('classes/' + old + '/members/' + fb.user.uid).delete().catch(() => {});
+    el.remove(); if (!gate.el && !tour.el) document.documentElement.classList.remove('gated');
+    cls.info = null; cls.board = null; cls.boardAt = 0; cls.lastReady = null;
+    await classSync(); await loadBoard();
+    if (!ui.build && !(ui.exam && ui.exam.phase === 'run')) render();
+    if (then) then();
+  });
+}
+async function afterLogin(){
+  if (!(M.profile && M.profile.asked)) { showClassPicker(maybeTour); return; }
+  await classSync(); await loadBoard();
+  if (!ui.build && !(ui.exam && ui.exam.phase === 'run')) render();
+  maybeTour();
 }
 
 /* ---------- Einführungstour mit Spotlight ---------- */
@@ -2011,8 +2224,8 @@ function paintGate(){
     <p class="gate-note">Mit Konto werden deine E-Mail-Adresse und dein Lernstand bei Google Firebase gespeichert. Andere Nutzer sehen sie nicht.</p>
   </div></div>`;
 }
-function hideGate(){ if (!gate.el) return; gate.el.remove(); gate.el = null; document.documentElement.classList.remove('gated'); maybeTour(); }
-function enterGuest(){ let seen = false; try { seen = localStorage.getItem(TOUR_KEY) === '1'; } catch(e) {} guestMode = true; hideGate(); renderSync(); if (seen) toast('Gastmodus: Es wird nichts gespeichert.'); }
+function hideGate(){ if (!gate.el) return; gate.el.remove(); gate.el = null; document.documentElement.classList.remove('gated'); }
+function enterGuest(){ let seen = false; try { seen = localStorage.getItem(TOUR_KEY) === '1'; } catch(e) {} guestMode = true; hideGate(); renderSync(); if (seen) toast('Gastmodus: Es wird nichts gespeichert.'); else maybeTour(); }
 
 async function connect(){
   if (!window.claude || !window.claude.use) { syncState = 'local'; ui.sample = null; render(); showGate(); fbStart(); return; }
@@ -2631,6 +2844,7 @@ function render(){
   else if (ui.view === 'exam') renderExam();
   { const sf = document.getElementById('setfab'); if (sf) { const on = ui.view === 'settings' || ui.view === 'login'; sf.classList.toggle('on', on); sf.setAttribute('aria-current', on ? 'page' : 'false'); } }
   enhance(); moveLens(); observeTitle(); countUp();
+  try { classRefresh(); } catch(e) {}
   saveUi();
 }
 function renderSync(){
@@ -2676,6 +2890,7 @@ function renderList(){
   $main.innerHTML = `
     <div class="lt"><h1>Fächer</h1></div>
     <div class="glass list" style="margin-bottom:22px"><button class="row add" data-view-go="help"><span class="add-ic">?</span><span class="row-title">Anleitung: so lädst du deinen eigenen Lernstoff hoch</span></button><button class="row add" data-tour><span class="add-ic">→</span><span class="row-title">Kurze Tour: so funktioniert Kognit</span></button></div>
+    ${classCardHtml()}
     ${groups}
     ${orphans.length ? `<section style="--fach:#8E8E93;--fach-rgb:142,142,147"><h2 class="group-title">Ohne Fach</h2><div class="glass list">${orphans.map(kaRow).join('')}</div></section>` : ''}
     <section><h2 class="group-title">Neues Fach</h2>
@@ -2697,6 +2912,8 @@ function renderSettings(){
         <button class="row add" data-restorebtn><span class="add-ic">↑</span><span class="row-title">Lernstand hochladen</span></button>
         <input type="file" accept=".json,application/json" data-restore hidden></div>
       <p class="footnote">Speichert alle Fächer, deinen Stoff und deinen Fortschritt als Datei. So nimmst du alles auf ein anderes Gerät mit. <button class="linklike" data-view-go="help">So geht’s</button></p></section>` : ''}
+    ${classSectionHtml()}
+    ${adminSectionHtml()}
     <section><h2 class="group-title">Hilfe</h2>
       <div class="glass list"><button class="row add" data-view-go="help"><span class="add-ic">?</span><span class="row-title">Anleitung: eigenen Lernstoff hochladen</span></button><button class="row add" data-tour><span class="add-ic">\u2192</span><span class="row-title">Kurze Tour: so funktioniert Kognit</span></button></div></section>
     <p class="footnote" id="syncline"></p>`;
@@ -3157,6 +3374,7 @@ function renderHome(){
     </section>
     <button class="glass next" data-next="${ns.act}" data-id="${ns.id}"><span class="next-ic">${ns.icon}</span>
       <span class="row-main"><span class="row-sub">Als Nächstes</span><span class="row-title">${esc(ns.title)}</span></span>${I.chev}</button>
+    ${fb.user && kid === classKaId() && cls.info ? `<h2 class="group-title">Leaderboard · ${esc(cls.info.name)}</h2><div class="glass pad board-card"><p class="cc-head" style="margin-top:0">Bereit-% aus dem Quiz</p>${boardHtml()}</div>` : ''}
     <h2 class="group-title">Lernpfad</h2>
     <div class="glass path">${rows || '<div class="step"><span class="row-sub">Noch keine Themen.</span></div>'}</div>
     <h2 class="group-title">Probeprüfung</h2>
@@ -3611,6 +3829,9 @@ $main.addEventListener('click', async e => {
   else if ('fblogout' in d) fbLogout();
   else if ('backup' in d) saveBackup();
   else if ('tour' in d) openTour(0);
+  else if ('classpick' in d) showClassPicker();
+  else if ('adpublish' in d) adminPublish();
+  else if ('adnewclass' in d) adminNewClass();
   else if ('restorebtn' in d) { const inp = $main.querySelector('[data-restore]'); if (inp) inp.click(); }
   else if ('copyprompt' in d) {
     const txt = importPrompt(); let done = false;
