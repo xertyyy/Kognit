@@ -419,6 +419,13 @@ html.gated #toast{z-index:1001}
 .cc-head{margin:0 0 10px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--label2)}
 .cc-head small{font-weight:500;text-transform:none;letter-spacing:0;margin-left:6px}
 .board-card{margin-bottom:6px}
+.msgcard{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;margin-bottom:22px;border-radius:22px}
+.msgcard .msg-ic{font-size:22px;line-height:1.2}
+.msgcard .msg-main{flex:1;min-width:0}
+.msgcard .msg-head{margin:0 0 2px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent-ink)}
+.msgcard .msg-text{margin:0;font-size:15px;line-height:1.45;color:var(--label);white-space:pre-wrap;overflow-wrap:anywhere}
+.adm-member .row-title small{font-weight:500;color:var(--label2)}
+.pill-btn.alt.danger-pill{color:var(--red,#FF3B30);border-color:rgba(255,59,48,.35)}
 .admin-tag{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink);background:rgba(var(--acc-rgb),.14);padding:2px 8px;border-radius:999px;margin-left:8px;vertical-align:middle}
 html.touring,html.touring body{overflow:hidden}
 #tour{position:fixed;inset:0;z-index:1000}
@@ -1920,7 +1927,7 @@ async function loadClassList(){
   try {
     const q = await fb.fs.collection('classes').get(), arr = [];
     q.forEach(d => { const x = d.data() || {}; arr.push({ id:d.id, name:String(x.name || d.id).slice(0, 40) }); });
-    DEFAULT_CLASSES.forEach(c => { if (!arr.some(x => x.id === c.id)) arr.push(c); });
+    if (!arr.length) DEFAULT_CLASSES.forEach(c => arr.push(c));
     arr.sort((a, b) => a.name.localeCompare(b.name, 'de')); cls.list = arr;
   } catch(e) {}
 }
@@ -1930,7 +1937,17 @@ async function classSync(){
   try {
     const d = await fb.fs.doc('classes/' + cid).get();
     const x = d.exists ? d.data() || {} : {};
-    cls.info = { id:cid, name:String(x.name || className(cid)), next:x.next && x.next.id ? x.next : null };
+    if (Array.isArray(x.removed) && x.removed.includes(fb.user.uid)) {
+      const nm = String(x.name || className(cid));
+      M.profile = Object.assign({}, M.profile, { classId:null }); persist('meta', M); cls.info = null; cls.board = null; cls.me = null;
+      toast('Du wurdest aus der Klasse ' + nm + ' entfernt.'); return;
+    }
+    if (!d.exists && !DEFAULT_CLASSES.some(c => c.id === cid)) {
+      M.profile = Object.assign({}, M.profile, { classId:null, asked:false }); persist('meta', M); cls.info = null; cls.board = null; cls.me = null;
+      toast('Deine Klasse gibt es nicht mehr. W\u00e4hl im Profil eine neue.'); return;
+    }
+    cls.info = { id:cid, name:String(x.name || className(cid)), next:x.next && x.next.id ? x.next : null, msg:x.msg && x.msg.text ? x.msg : null };
+    { const ff = fach('f-' + cid); if (ff && ff.name !== cls.info.name) { ff.name = cls.info.name; persist('meta', M); } }
     const nx = cls.info.next, kid = classKaId();
     if (!nx || !kid) return;
     if (kid !== nx.id) {
@@ -2016,8 +2033,8 @@ async function pumpAnswers(){
     }
   } finally { ansBusy = false; }
 }
-function boardReady(h){
-  const ts = topicsOf(classKaId());
+function boardReady(h){ return readyFromH(h, topicsOf(classKaId())); }
+function readyFromH(h, ts){
   if (!ts.length || !h) return 0;
   const vals = ts.map(t => { const v = Array.isArray(h[t.id]) ? h[t.id].filter(x => typeof x === 'number') : []; if (!v.length) return 0; const avg = v.reduce((x, y) => x + Math.max(0, Math.min(1, y)), 0) / v.length; return avg * Math.min(1, v.length / 5); });
   return Math.round(vals.reduce((x, y) => x + y, 0) / ts.length * 100);
@@ -2067,21 +2084,137 @@ function classSectionHtml(){
 }
 function adminSectionHtml(){
   if (!isAdmin()) return '';
-  const own = M.arbeiten.filter(a => !a.classKa);
-  const cur = cls.info && cls.info.next ? cls.info.next : null;
-  return `<section><h2 class="group-title">Klasse verwalten <small class="admin-tag">Admin</small></h2>
-    <div class="glass pad"><div class="form">
-      <label>Klasse<select id="ad-class">${cls.list.map(c => `<option value="${esc(c.id)}" ${c.id === myClass() ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
-      <label>Nächste Klassenarbeit<select id="ad-ka">${own.map(a => `<option value="${esc(a.id)}" ${cur && cur.id === a.id ? 'selected' : ''}>${esc(a.title)}${fach(a.fachId) ? ' (' + esc(fach(a.fachId).name) + ')' : ''}</option>`).join('')}</select></label>
-      ${cur ? `<p class="hint" style="margin:0">Aktuell f\u00fcr ${esc(cls.info.name)}: <b>${esc(cur.title)}</b></p>` : ''}
-      <button class="btn" data-adpublish>F\u00fcr die Klasse ver\u00f6ffentlichen</button>
-      <p class="hint" style="margin:0">Alle in der Klasse bekommen diese Klassenarbeit mit Lernseiten und Fragen und sehen sie oben unter \u201eF\u00e4cher\u201c. Dein eigener Fortschritt wird nicht mitgeschickt. Wenn du die Klassenarbeit sp\u00e4ter \u00e4nderst, ver\u00f6ffentliche sie einfach noch einmal.</p>
-      <div class="row field" style="padding:0"><input id="ad-newclass" type="text" maxlength="40" placeholder="Neue Klasse, z. B. EFS 226" aria-label="Name der neuen Klasse"><button class="btn small" data-adnewclass>Anlegen</button></div>
-    </div></div></section>`;
+  return `<section><h2 class="group-title">Admin <small class="admin-tag">nur du</small></h2>
+    <div class="glass list"><button class="row add" data-view-go="admin"><span class="add-ic">⚙</span><span class="row-title">Admin-Panel öffnen</span></button></div>
+    <p class="footnote">Klassen, nächste Klassenarbeit, Mitteilungen und Mitglieder verwalten.</p></section>`;
+}
+function classMsgHtml(){
+  const m = fb.user && cls.info && cls.info.msg;
+  if (!m || !m.text || local.get('msgseen-' + cls.info.id) === m.at) return '';
+  return `<div class="glass msgcard" role="status"><span class="msg-ic" aria-hidden="true">📣</span><div class="msg-main"><p class="msg-head">Mitteilung \u00b7 ${esc(cls.info.name)}</p><p class="msg-text">${esc(m.text)}</p></div><button class="linklike" data-msgok="${esc(String(m.at))}">Ausblenden</button></div>`;
+}
+
+/* ---------- Admin-Panel (nur f\u00fcr das Admin-Konto) ---------- */
+const adm = { cid:null, info:null, members:null, busy:false };
+function tsMs(v){ return v && typeof v.toMillis === 'function' ? v.toMillis() : (typeof v === 'number' ? v : 0); }
+function agoText(ms){
+  if (!ms) return 'noch nie';
+  const m = Math.round((Date.now() - ms) / 60000);
+  if (m < 2) return 'gerade eben'; if (m < 60) return 'vor ' + m + ' Min.';
+  const h = Math.round(m / 60); if (h < 24) return 'vor ' + h + ' Std.';
+  const d = Math.round(h / 24); return d === 1 ? 'gestern' : 'vor ' + d + ' Tagen';
+}
+async function adminLoad(){
+  if (!isAdmin()) return;
+  await loadClassList();
+  if (!adm.cid || !cls.list.some(c => c.id === adm.cid)) adm.cid = cls.list.some(c => c.id === myClass()) ? myClass() : (cls.list[0] ? cls.list[0].id : null);
+  adm.info = null; adm.members = null;
+  if (!adm.cid) { adm.members = []; return; }
+  try {
+    const d = await fb.fs.doc('classes/' + adm.cid).get(), x = d.exists ? d.data() || {} : {};
+    adm.info = { exists:d.exists, name:String(x.name || className(adm.cid)), next:x.next && x.next.id ? x.next : null, msg:x.msg && x.msg.text ? x.msg : null, removed:Array.isArray(x.removed) ? x.removed : [] };
+    const q = await fb.fs.collection('classes/' + adm.cid + '/scores').get(), arr = [];
+    q.forEach(sd => { const v = sd.data() || {}; arr.push({ uid:sd.id, name:String(v.name || '?').slice(0, 30), kaId:v.kaId, h:v.h && typeof v.h === 'object' ? v.h : {}, lastAt:tsMs(v.lastAt) }); });
+    adm.members = arr;
+  } catch(e) { adm.info = adm.info || { exists:false, name:className(adm.cid), next:null, msg:null, removed:[] }; adm.members = []; toast('Admin-Daten konnten nicht geladen werden. Pr\u00fcf die Firestore-Regeln.'); }
+}
+function admTopics(){
+  const nx = adm.info && adm.info.next; if (!nx) return [];
+  return topicsOf(ka(nx.id) ? nx.id : 'c-' + adm.cid + '-' + nx.id);
+}
+function renderAdmin(){
+  if (!isAdmin()) { go('settings'); return; }
+  if (!adm.info && !adm.busy) { adm.busy = true; adminLoad().finally(() => { adm.busy = false; if (ui.view === 'admin') render(); }); }
+  const i = adm.info, nx = i && i.next, own = M.arbeiten.filter(a => !a.classKa), ts = admTopics();
+  const members = (adm.members || []).map(m => Object.assign({}, m, { ready:nx && m.kaId === nx.id ? readyFromH(m.h, ts) : null })).sort((a, b) => (b.ready || 0) - (a.ready || 0) || a.name.localeCompare(b.name, 'de'));
+  const rows = members.map(m => `<div class="row adm-member"><span class="row-main"><span class="row-title">${esc(m.name)}${m.uid === fb.user.uid ? ' <small>(du)</small>' : ''}</span>
+      <span class="row-sub">${m.ready == null ? 'noch keine Punkte f\u00fcr die aktuelle Arbeit' : m.ready + ' % bereit'} \u00b7 zuletzt aktiv ${agoText(m.lastAt)}</span></span>
+      ${m.uid === fb.user.uid ? '' : `<button class="pill-btn alt danger-pill" data-admkick="${esc(m.uid)}" data-name="${esc(m.name)}">Entfernen</button>`}</div>`).join('');
+  $main.innerHTML = `
+    <div class="lt"><h1>Admin-Panel</h1></div>
+    <section><h2 class="group-title">Klasse</h2>
+      <div class="glass pad"><div class="form">
+        <label>Klasse w\u00e4hlen<select id="adm-class">${cls.list.map(c => `<option value="${esc(c.id)}" ${c.id === adm.cid ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
+        ${i ? `<label>Name<input id="adm-name" type="text" maxlength="40" value="${esc(i.name)}"></label>
+        <div class="row-actions" style="margin-top:0"><button class="btn small" data-admrename>Umbenennen</button><button class="btn small danger" data-admdelete>Klasse l\u00f6schen</button></div>` : '<p class="hint" style="margin:0">L\u00e4dt \u2026</p>'}
+        <div class="row field" style="padding:0"><input id="ad-newclass" type="text" maxlength="40" placeholder="Neue Klasse, z. B. EFS 226" aria-label="Name der neuen Klasse"><button class="btn small" data-adnewclass>Anlegen</button></div>
+      </div></div></section>
+    <section><h2 class="group-title">N\u00e4chste Klassenarbeit</h2>
+      <div class="glass pad"><div class="form">
+        ${nx ? `<p style="margin:0;font-weight:700">${esc(nx.title)}</p>
+        <div class="inline"><label>Datum<input type="date" id="adm-date" value="${esc(nx.date || '')}"></label><label>Uhrzeit<input type="time" id="adm-time" value="${esc(nx.time || '')}"></label></div>
+        <div class="row-actions" style="margin-top:0"><button class="btn small" data-admdate>Datum speichern</button><button class="btn small ghost" data-admunpub>Zur\u00fcckziehen</button></div>` : '<p class="hint" style="margin:0">F\u00fcr diese Klasse ist gerade keine Klassenarbeit ver\u00f6ffentlicht.</p>'}
+        <label>${nx ? 'Andere Klassenarbeit ver\u00f6ffentlichen' : 'Klassenarbeit ver\u00f6ffentlichen'}<select id="ad-ka">${own.map(a => `<option value="${esc(a.id)}" ${nx && nx.id === a.id ? 'selected' : ''}>${esc(a.title)}${fach(a.fachId) ? ' (' + esc(fach(a.fachId).name) + ')' : ''}</option>`).join('')}</select></label>
+        <button class="btn" data-adpublish>F\u00fcr die Klasse ver\u00f6ffentlichen</button>
+        <p class="hint" style="margin:0">Die Klasse bekommt die Arbeit mit Lernseiten und Fragen. Hast du sie ge\u00e4ndert, ver\u00f6ffentliche sie einfach noch einmal.</p>
+      </div></div></section>
+    <section><h2 class="group-title">Mitteilung an die Klasse</h2>
+      <div class="glass pad"><div class="form">
+        ${i && i.msg ? `<div class="tip"><b>Aktuell:</b> ${esc(i.msg.text)}</div>` : ''}
+        <label>Text<textarea id="adm-msg" maxlength="300" placeholder="z. B. Die Arbeit wurde auf Freitag verschoben."></textarea></label>
+        <div class="row-actions" style="margin-top:0"><button class="btn small" data-admmsg>Senden</button>${i && i.msg ? '<button class="btn small ghost" data-admmsgdel>Mitteilung entfernen</button>' : ''}</div>
+        <p class="hint" style="margin:0">Erscheint bei allen in der Klasse oben unter \u201eF\u00e4cher\u201c, bis sie sie ausblenden.</p>
+      </div></div></section>
+    <section><h2 class="group-title">Mitglieder${adm.members ? ' (' + adm.members.length + ')' : ''}</h2>
+      <div class="glass list">${adm.members == null ? '<div class="row"><span class="row-sub">L\u00e4dt \u2026</span></div>' : rows || '<div class="row"><span class="row-sub">Noch niemand. Mitglieder erscheinen, sobald eine Klassenarbeit ver\u00f6ffentlicht ist und sie die App \u00f6ffnen.</span></div>'}</div>
+      <p class="footnote">Entfernte verschwinden aus dem Leaderboard und k\u00f6nnen der Klasse erst wieder beitreten, wenn du sie zul\u00e4sst.${i && i.removed.length ? ` <button class="linklike" data-admunban>${i.removed.length} ${i.removed.length === 1 ? 'Entfernten' : 'Entfernte'} wieder zulassen</button>` : ''}</p></section>
+    <p class="footnote"><button class="linklike" data-admreload>Neu laden</button></p>`;
+}
+async function admRun(fn, ok){
+  if (!isAdmin() || adm.busy) return;
+  adm.busy = true;
+  try { await fn(); if (ok) toast(ok); }
+  catch(e) { console.warn(e); toast('Das hat nicht geklappt. Pr\u00fcf die Firestore-Regeln.'); }
+  adm.busy = false;
+  await adminLoad();
+  if (adm.cid && adm.cid === myClass()) { cls.boardAt = 0; await classSync(); await loadBoard(); }
+  if (ui.view === 'admin') render();
+}
+async function admDeleteAnswers(cid, uid){
+  const path = 'classes/' + cid + '/scores/' + uid + '/answers', q = await fb.fs.collection(path).get(), ids = [];
+  q.forEach(d => ids.push(d.id));
+  for (let k = 0; k < ids.length; k += 400) { const b = fb.fs.batch(); ids.slice(k, k + 400).forEach(id => b.delete(fb.fs.doc(path + '/' + id))); await b.commit(); }
+}
+async function admAction(kind, el){
+  const cid = adm.cid, i = adm.info, ref = cid && fb.fs.doc('classes/' + cid);
+  if (!cid || !i) return;
+  if (kind === 'rename') {
+    const name = (document.getElementById('adm-name').value || '').trim().slice(0, 40);
+    if (!name) { toast('Gib einen Namen ein.'); return; }
+    admRun(() => ref.set({ name }, { merge:true }), 'Klasse umbenannt.');
+  } else if (kind === 'delete') {
+    if (!(await dialog(`Klasse \u201e${i.name}\u201c wirklich l\u00f6schen? Leaderboard, Mitteilung und ver\u00f6ffentlichte Arbeiten der Klasse werden gel\u00f6scht. Die Lernst\u00e4nde der Mitglieder bleiben bei ihnen.`, { ok:'L\u00f6schen', danger:true }))) return;
+    admRun(async () => {
+      for (const m of adm.members || []) { await admDeleteAnswers(cid, m.uid); await fb.fs.doc('classes/' + cid + '/scores/' + m.uid).delete(); }
+      const cq = await fb.fs.collection('classes/' + cid + '/content').get(), cids = []; cq.forEach(d => cids.push(d.id));
+      for (const id of cids) await fb.fs.doc('classes/' + cid + '/content/' + id).delete();
+      await ref.delete();
+      if (cid === myClass()) { M.profile = Object.assign({}, M.profile, { classId:null }); persist('meta', M); cls.info = null; cls.board = null; cls.me = null; }
+      adm.cid = null;
+    }, 'Klasse gel\u00f6scht.');
+  } else if (kind === 'date') {
+    const date = document.getElementById('adm-date').value || '', time = document.getElementById('adm-time').value || '';
+    admRun(() => ref.set({ next:Object.assign({}, i.next, { date, time }) }, { merge:true }), 'Datum gespeichert.');
+  } else if (kind === 'unpub') {
+    if (!(await dialog(`\u201e${i.next.title}\u201c f\u00fcr ${i.name} zur\u00fcckziehen? Die Klasse sieht dann keine n\u00e4chste Klassenarbeit und kein Leaderboard mehr.`, { ok:'Zur\u00fcckziehen' }))) return;
+    admRun(async () => { await fb.fs.doc('classes/' + cid + '/content/' + i.next.id).delete(); await ref.set({ next:null }, { merge:true }); }, 'Zur\u00fcckgezogen.');
+  } else if (kind === 'msg') {
+    const text = (document.getElementById('adm-msg').value || '').trim().slice(0, 300);
+    if (!text) { toast('Schreib zuerst eine Mitteilung.'); return; }
+    admRun(() => ref.set({ msg:{ text, at:Date.now() } }, { merge:true }), 'Mitteilung gesendet.');
+  } else if (kind === 'msgdel') {
+    admRun(() => ref.set({ msg:null }, { merge:true }), 'Mitteilung entfernt.');
+  } else if (kind === 'kick') {
+    const uid = el.dataset.admkick, name = el.dataset.name || 'Diese Person';
+    if (!(await dialog(`${name} aus ${i.name} entfernen? Die Eintr\u00e4ge im Leaderboard werden gel\u00f6scht.`, { ok:'Entfernen', danger:true }))) return;
+    admRun(async () => { await ref.set({ removed:i.removed.filter(x => x !== uid).concat([uid]) }, { merge:true }); await admDeleteAnswers(cid, uid); await fb.fs.doc('classes/' + cid + '/scores/' + uid).delete(); }, name + ' wurde entfernt.');
+  } else if (kind === 'unban') {
+    admRun(() => ref.set({ removed:[] }, { merge:true }), 'Alle Entfernten d\u00fcrfen wieder beitreten.');
+  }
 }
 async function adminPublish(){
   if (!isAdmin()) return;
-  const cid = (document.getElementById('ad-class') || {}).value, kid = (document.getElementById('ad-ka') || {}).value, a = ka(kid);
+  const cid = (document.getElementById('adm-class') || document.getElementById('ad-class') || {}).value, kid = (document.getElementById('ad-ka') || {}).value, a = ka(kid);
   if (!cid || !a) { toast('W\u00e4hl eine Klasse und eine Klassenarbeit aus.'); return; }
   const name = className(cid);
   if (!(await dialog(`\u201e${a.title}\u201c als n\u00e4chste Klassenarbeit f\u00fcr ${name} ver\u00f6ffentlichen?`, { ok:'Ver\u00f6ffentlichen' }))) return;
@@ -2094,6 +2227,7 @@ async function adminPublish(){
     await fb.fs.doc('classes/' + cid).set({ name, next:{ id:kid, title:a.title, date:a.date || '', time:a.time || '', updated:now } }, { merge:true });
     toast('Ver\u00f6ffentlicht f\u00fcr ' + name + '.');
     cls.boardAt = 0; if (cid === myClass()) { await classSync(); await loadBoard(); }
+    if (ui.view === 'admin') await adminLoad();
     render();
   } catch(e) { toast('Das hat nicht geklappt. Pr\u00fcf die Firestore-Regeln.'); }
 }
@@ -2103,7 +2237,7 @@ async function adminNewClass(){
   const id = name.toLowerCase().replace(/\u00e4/g, 'ae').replace(/\u00f6/g, 'oe').replace(/\u00fc/g, 'ue').replace(/\u00df/g, 'ss').replace(/[^a-z0-9]+/g, '');
   if (!name || !id) { toast('Gib einen Namen f\u00fcr die Klasse ein.'); return; }
   if (cls.list.some(c => c.id === id)) { toast('Diese Klasse gibt es schon.'); return; }
-  try { await fb.fs.doc('classes/' + id).set({ name }, { merge:true }); await loadClassList(); toast('Klasse ' + name + ' angelegt.'); render(); }
+  try { await fb.fs.doc('classes/' + id).set({ name }, { merge:true }); await loadClassList(); toast('Klasse ' + name + ' angelegt.'); if (ui.view === 'admin') { adm.cid = id; await adminLoad(); } render(); }
   catch(e) { toast('Das hat nicht geklappt. Pr\u00fcf die Firestore-Regeln.'); }
 }
 async function showClassPicker(then){
@@ -2875,12 +3009,13 @@ function render(){
   else if (ui.view === 'help') renderHelp();
   else if (ui.view === 'login') renderLogin();
   else if (ui.view === 'settings') renderSettings();
+  else if (ui.view === 'admin') renderAdmin();
   else if (!a) { ui.view = 'list'; renderList(); }
   else if (ui.view === 'home') renderHome();
   else if (ui.view === 'kb') renderKb();
   else if (ui.view === 'quiz') renderQuiz();
   else if (ui.view === 'exam') renderExam();
-  { const sf = document.getElementById('setfab'); if (sf) { const on = ui.view === 'settings' || ui.view === 'login'; sf.classList.toggle('on', on); sf.setAttribute('aria-current', on ? 'page' : 'false'); } }
+  { const sf = document.getElementById('setfab'); if (sf) { const on = ui.view === 'settings' || ui.view === 'login' || ui.view === 'admin'; sf.classList.toggle('on', on); sf.setAttribute('aria-current', on ? 'page' : 'false'); } }
   enhance(); moveLens(); observeTitle(); countUp();
   try { classRefresh(); } catch(e) {}
   saveUi();
@@ -2928,6 +3063,7 @@ function renderList(){
   $main.innerHTML = `
     <div class="lt"><h1>Fächer</h1></div>
     <div class="glass list" style="margin-bottom:22px"><button class="row add" data-view-go="help"><span class="add-ic">?</span><span class="row-title">Anleitung: so lädst du deinen eigenen Lernstoff hoch</span></button><button class="row add" data-tour><span class="add-ic">→</span><span class="row-title">Kurze Tour: so funktioniert Kognit</span></button></div>
+    ${classMsgHtml()}
     ${classCardHtml()}
     ${groups}
     ${orphans.length ? `<section style="--fach:#8E8E93;--fach-rgb:142,142,147"><h2 class="group-title">Ohne Fach</h2><div class="glass list">${orphans.map(kaRow).join('')}</div></section>` : ''}
@@ -3825,6 +3961,7 @@ $main.addEventListener('change', e => {
   else if (t.matches('[data-ff="fachId"]')) { ui.form.fachId = t.value; render(); }
   else if (t.matches('[data-files]')) { ui.form.files = ui.form.files.concat(Array.from(t.files || [])); render(); }
   else if (t.id === 'ex-n') ui.exam.n = +t.value;
+  else if (t.id === 'adm-class') { adm.cid = t.value; adm.info = null; adm.members = null; render(); }
   else if (t.matches('[data-restore]')) { const file = t.files && t.files[0]; t.value = ''; if (file) loadBackup(file); }
 });
 $main.addEventListener('input', e => {
@@ -3869,6 +4006,16 @@ $main.addEventListener('click', async e => {
   else if ('tour' in d) openTour(0);
   else if ('classpick' in d) showClassPicker();
   else if ('adpublish' in d) adminPublish();
+  else if ('admrename' in d) admAction('rename');
+  else if ('admdelete' in d) admAction('delete');
+  else if ('admdate' in d) admAction('date');
+  else if ('admunpub' in d) admAction('unpub');
+  else if ('admmsg' in d) admAction('msg');
+  else if ('admmsgdel' in d) admAction('msgdel');
+  else if (d.admkick) admAction('kick', e.target.closest('[data-admkick]'));
+  else if ('admunban' in d) admAction('unban');
+  else if ('admreload' in d) { adm.info = null; adm.members = null; render(); }
+  else if (d.msgok) { local.set('msgseen-' + (cls.info && cls.info.id), +d.msgok || d.msgok); render(); }
   else if ('adnewclass' in d) adminNewClass();
   else if ('restorebtn' in d) { const inp = $main.querySelector('[data-restore]'); if (inp) inp.click(); }
   else if ('copyprompt' in d) {
