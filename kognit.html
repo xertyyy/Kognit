@@ -837,7 +837,30 @@ nav.tabs button[aria-current="page"] svg{transform:scale(1.1)}
 .qnav .btn.big{flex:1 1 0;width:auto;min-width:0}
 .qnav .qback{display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .qnav .qback svg{width:17px;height:17px;flex:0 0 17px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
-.pill-pair{display:inline-flex;gap:6px;flex:0 0 auto}
+.pill-pair{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto}
+.gauge{display:inline-grid;justify-items:center;flex:0 0 46px;width:46px;line-height:1;--gc:hsl(var(--gh) 82% 47%);--gt:hsl(var(--gh) 75% 36%)}
+.gauge svg{width:42px;height:27px;overflow:visible}
+.gauge .g-bg{fill:none;stroke:var(--fill2);stroke-width:5;stroke-linecap:round}
+.gauge .g-val{fill:none;stroke:var(--gc);stroke-width:5;stroke-linecap:round;filter:drop-shadow(0 0 3px var(--gc));transition:stroke-dasharray .8s ease,stroke .8s ease}
+.gauge .g-needle{stroke:var(--label);stroke-width:2.2;stroke-linecap:round;transform-box:view-box;transform-origin:20px 21px;transform:rotate(var(--ga));transition:transform .9s cubic-bezier(.2,1.3,.3,1)}
+.gauge .g-hub{fill:var(--label)}
+.gauge b{margin-top:2px;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--gt)}
+.gauge.none b{color:var(--label3);font-weight:600}
+.gauge.none .g-needle{stroke:var(--label3)} .gauge.none .g-hub{fill:var(--label3)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .gauge{--gc:hsl(var(--gh) 85% 55%);--gt:hsl(var(--gh) 85% 64%)}}
+:root[data-theme="dark"] .gauge{--gc:hsl(var(--gh) 85% 55%);--gt:hsl(var(--gh) 85% 64%)}
+.gauge.anim .g-val{animation:gArc 1s cubic-bezier(.3,.8,.3,1) both}
+.gauge.anim .g-needle{animation:gNeedle 1.15s cubic-bezier(.2,1.35,.3,1) both}
+@keyframes gArc{from{stroke-dasharray:0 100}}
+@keyframes gNeedle{from{transform:rotate(-90deg)}}
+.path .step .row-main{min-width:0}
+.path .step .row-title{overflow-wrap:anywhere}
+@media (max-width: 560px){
+  .path .step{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:14px;row-gap:6px;align-items:center}
+  .path .step .node{grid-row:1 / span 2;align-self:center}
+  .path .step .row-main{grid-column:2;padding:2px 0 0}
+  .path .step .pill-pair{grid-column:2;justify-self:start}
+}
 .pill-btn.alt{background:transparent;color:var(--accent-ink);border:1px solid rgba(var(--acc-rgb),.35)}
 @media (max-width:380px){.pill-pair .pill-btn{padding:7px 11px;font-size:13.5px}}
 .qnav .navbtn{width:52px;height:52px;flex-basis:52px;background:var(--glass-hi)}
@@ -2477,6 +2500,14 @@ function examDate(a){ if (!a || !a.date) return null; const [y, m, d] = a.date.s
 function untilText(a){ const dt = examDate(a); if (!dt) return ''; const ms = dt - new Date(); if (ms <= 0) return 'vorbei'; const h = Math.floor(ms / 3.6e6), d = Math.floor(h / 24); return 'noch ' + (d ? d + (d === 1 ? ' Tag ' : ' Tage ') : '') + (h % 24) + ' Std.'; }
 function dateText(a){ const dt = examDate(a); if (!dt) return 'ohne Datum'; return dt.toLocaleDateString('de-DE', { weekday:'short', day:'2-digit', month:'2-digit', year:'numeric' }) + (a.time ? ', ' + a.time + ' Uhr' : ''); }
 
+/* Tacho: wie sicher ein Thema sitzt (0 % rot bis 100 % grün) */
+function gaugeHtml(l, anim){
+  const pct = l.n ? Math.round(l.avg * 100) : 0, hue = Math.round(pct * 1.2);
+  const arc = 'M5 21 A15 15 0 0 1 35 21';
+  return `<span class="gauge ${l.n ? '' : 'none'} ${anim ? 'anim' : ''}" style="--gh:${hue};--ga:${-90 + pct * 1.8}deg" role="img" aria-label="${esc(l.label)}${l.n ? ', ' + pct + ' Prozent' : ''}" title="${esc(l.label)}${l.n ? ' · ' + pct + ' %' : ''}">
+    <svg viewBox="0 0 40 26" aria-hidden="true"><path class="g-bg" d="${arc}" pathLength="100"/>${l.n ? `<path class="g-val" d="${arc}" pathLength="100" style="stroke-dasharray:${pct} 100"/>` : ''}<line class="g-needle" x1="20" y1="21" x2="20" y2="9.5"/><circle class="g-hub" cx="20" cy="21" r="2.3"/></svg>
+    <b>${l.n ? pct + ' %' : 'neu'}</b></span>`;
+}
 function level(kid, tid){
   const h = ((P[kid] && P[kid].hist[tid]) || []).slice(-10);
   const n = h.length, sum = h.reduce((a, b) => a + b, 0), avg = n ? sum / n : 0;
@@ -3529,9 +3560,8 @@ function renderHome(){
     const l = level(kid, t.id), d = !!p.done[t.id];
     return `<div class="step ${d ? 'done' : t.id === curId ? 'cur' : ''}">
       <button class="node" data-toggle="${t.id}" role="checkbox" aria-checked="${d}" aria-label="${esc(t.title)} als gelesen markieren"><svg viewBox="0 0 24 24" aria-hidden="true">${TI[topicIconName(t)]}</svg><span class="badge-ok">${I.check}</span></button>
-      <button class="row-main" data-read="${t.id}"><span class="row-title">${esc(t.title)}</span>
-        <span class="row-sub"><i class="lvl ${l.cls}"></i>${esc(l.label)}${l.n ? ` <span class="muted">${Math.round(l.avg * 100)} %</span>` : ''}</span></button>
-      <span class="pill-pair"><button class="pill-btn alt" data-read="${t.id}">Lesen</button><button class="pill-btn" data-practice="${t.id}">Quiz</button></span></div>`;
+      <button class="row-main" data-read="${t.id}"><span class="row-title">${esc(t.title)}</span></button>
+      <span class="pill-pair">${gaugeHtml(l, anim)}<button class="pill-btn alt" data-read="${t.id}">Lesen</button><button class="pill-btn" data-practice="${t.id}">Quiz</button></span></div>`;
   }).join('');
   const ex = p.exams || [], last = ex[ex.length - 1];
   const fopts = M.faecher.map(x => `<option value="${x.id}" ${a.fachId === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
