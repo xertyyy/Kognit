@@ -3234,7 +3234,7 @@ Antworte nur mit JSON: {"html":"..."}`;
 function tchatInner(t){
   const c = ui.tchat && ui.tchat.id === t.id ? ui.tchat : { msgs:[] };
   const msgs = c.msgs.map(m => `<p style="white-space:pre-wrap;margin:8px 0"><b>${m.r === 'u' ? 'Du' : 'KI'}:</b> ${esc(m.t)}</p>`).join('');
-  return `<details class="tchat" ${c.msgs.length ? 'open' : ''}><summary>${I.spark} Frag die KI zu diesem Thema</summary>
+  return `<details class="tchat" ${c.msgs.length ? 'open' : ''}><summary>${I.spark.replace('<svg ', '<svg style="width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;vertical-align:-4px;margin-right:4px" ')}Frag die KI zu diesem Thema</summary>
     ${msgs || '<p class="hint">Stell eine Frage zum Thema. Die KI antwortet auf Grundlage dieser Lernseite. Prüf Wichtiges trotzdem im Unterricht nach.</p>'}${c.busy ? '<p class="hint">KI denkt nach …</p>' : ''}
     <div class="row-actions"><input type="text" id="tcin" maxlength="500" style="flex:1;min-width:0" placeholder="Deine Frage …" aria-label="Frage an die KI" value="${esc(c.draft || '')}" ${c.busy ? 'disabled' : ''}><button class="btn small" data-tcsend ${c.busy ? 'disabled' : ''}>Fragen</button></div></details>`;
 }
@@ -3966,6 +3966,9 @@ function kbArticle(t){
 }
 
 /* ---------- Quiz ---------- */
+/* Leicht → schwer: Multiple Choice, freie Antwort, Rechnen, Code. Innerhalb einer Stufe bleibt es zufällig. */
+const Q_LEVEL = { mc:1, free:2, calc:3, code:4 };
+const byLevel = deck => deck.slice().sort((a, b) => (Q_LEVEL[a.t] || 2) - (Q_LEVEL[b.t] || 2));
 function buildDeck(pool){
   const wrong = (P[ui.ka] && P[ui.ka].wrong) || {};
   const rep = shuffle(pool.filter(q => wrong[qKey(q)])).sort((a, b) => wrong[qKey(b)] - wrong[qKey(a)]).slice(0, 2);
@@ -3973,7 +3976,7 @@ function buildDeck(pool){
   let deck = rep.concat(rest).slice(0, QUIZ_N);
   if (!deck.some(q => q.t === 'code')) { const c = rest.find(q => q.t === 'code' && !deck.includes(q)); if (c && deck.length) deck[deck.length - 1] = c; }
   ui.repeat = rep.map(qKey);
-  return shuffle(deck);
+  return byLevel(shuffle(deck));
 }
 function startDeck(){ ui.deckKa = ui.ka; const pool = poolOf(ui.ka); ui.deck = buildDeck(ui.qTopic === 'all' ? pool : pool.filter(q => q.topic === ui.qTopic)); ui.idx = 0; ui.codeRes = null; ui.codeTry = null; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null; ui.session = { n:0, sum:0 }; ui.summaryDone = false; }
 /* Quiz-Runde merken, damit sie beim Wechseln oder Neuladen nicht verloren geht */
@@ -4191,7 +4194,7 @@ function localNew(){
   if (!added.length) { ui.genMsg = 'Alle eingebauten Fragen zu „' + t.title + '“ hast du schon.'; render(); return; }
   if (take.length) { p.bank = (p.bank || []).concat(take.map(q => q.id)); persist('prog-' + kid, p); }
   if (calcs.length) { const c = C[kid]; c.gen = c.gen.filter(q => !q.local).concat(c.gen.filter(q => q.local).slice(-25), calcs); capContent(c); persist('ka-' + kid, c); }
-  ui.deck = added.concat(ui.deck.slice(Math.min(ui.idx, ui.deck.length))).slice(0, QUIZ_N);
+  ui.deck = byLevel(added.concat(ui.deck.slice(Math.min(ui.idx, ui.deck.length))).slice(0, QUIZ_N));
   ui.idx = 0; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null;
   const left = fresh.length - take.length;
   ui.genMsg = added.length + ' neue Aufgaben stehen vorne.' + (a.builtin ? (left > 0 ? ' Noch ' + left + ' eingebaute Fragen zu diesem Thema.' : t.calcKind ? ' Ab jetzt gibt es hier nur noch Zufallsrechnungen.' : ' Das waren die letzten eingebauten Fragen zu diesem Thema.') : '');
@@ -4217,7 +4220,7 @@ Prüfe jede Zahl doppelt. Wiederhole diese vorhandenen Aufgaben nicht: ${existin
     if (!added.length) ui.genMsg = 'Claude hat keine brauchbaren Aufgaben geliefert. Probier es noch einmal.';
     else {
       const c = C[kid]; c.gen = c.gen.concat(added); capContent(c); persist('ka-' + kid, c);
-      ui.deck = shuffle(added).concat(ui.deck.slice(Math.min(ui.idx, ui.deck.length))).slice(0, QUIZ_N);
+      ui.deck = byLevel(shuffle(added).concat(ui.deck.slice(Math.min(ui.idx, ui.deck.length))).slice(0, QUIZ_N));
       ui.idx = 0; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null;
       ui.genMsg = added.length + ' neue Aufgaben stehen jetzt vorne.';
     }
