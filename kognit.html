@@ -626,7 +626,7 @@ nav.tabs .bar::before{content:"";position:absolute;inset:-1px;border-radius:inhe
   background:conic-gradient(from var(--siri),#FF9F0A,#FF375F,#BF5AF2,#0A84FF,#00C7BE,#34C759,#FF9F0A);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
   mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
-  animation:siri 9s linear infinite}
+  animation:siri 9s steps(180) infinite}
 @keyframes siri{to{--siri:360deg}}
 
 /* ---------- D1 Fachfarbe für Akzente ---------- */
@@ -754,7 +754,7 @@ nav.tabs{align-items:center;gap:10px}
   background:conic-gradient(from var(--siri),#FF9F0A,#FF375F,#BF5AF2,#0A84FF,#00C7BE,#34C759,#FF9F0A);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
   mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;
-  animation:siri 9s linear infinite}
+  animation:siri 9s steps(180) infinite}
 .timer-fab .ic{display:grid}
 .timer-fab .ic svg{width:24px;height:24px;stroke-width:1.8}
 .timer-fab .lb{font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -983,8 +983,8 @@ pre.cout{margin:0;max-height:220px;overflow:auto;white-space:pre-wrap}
 /* ---------- Antwort-Feedback: Motion im Liquid-Glass-Stil. Nur transform/opacity, damit es flüssig auf der GPU läuft ---------- */
 .opt{position:relative;isolation:isolate}
 .opt::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;opacity:0}
-.opt.right::after{box-shadow:0 0 0 1.5px var(--green),0 0 42px 4px rgba(52,199,89,.6)}
-.opt.wrong::after{box-shadow:0 0 0 1.5px var(--red),0 0 42px 4px rgba(255,59,48,.55)}
+.opt.right::after{box-shadow:0 0 0 1.5px var(--green),0 0 28px 2px rgba(52,199,89,.55)}
+.opt.wrong::after{box-shadow:0 0 0 1.5px var(--red),0 0 28px 2px rgba(255,59,48,.5)}
 .qcard.pop .opt.right{animation:fx-pop .75s var(--spring) both}
 .qcard.shake .opt.wrong{animation:fx-shake .5s cubic-bezier(.36,.07,.19,.97) both}
 .qcard.pop .opt.right::after,.qcard.shake .opt.wrong::after{animation:fx-glow 1.2s cubic-bezier(.2,.8,.2,1) both}
@@ -993,29 +993,31 @@ pre.cout{margin:0;max-height:220px;overflow:auto;white-space:pre-wrap}
 .opt.wrong .k::before{content:"✕";font-size:13px;font-weight:800}
 .fx-ans .opt.right .k,.fx-ans .opt.wrong .k{animation:fx-k .65s var(--spring) both}
 .opts:has(.opt.right) .opt:not(.right):not(.wrong){opacity:.5;transition:opacity .45s ease}
-.fx-ans .opt.right::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:1;
-  background:linear-gradient(105deg,transparent 32%,rgba(255,255,255,.42) 47%,rgba(255,255,255,.1) 53%,transparent 68%) no-repeat;
-  background-size:240% 100%;animation:fx-sheen .95s .12s cubic-bezier(.3,.7,.2,1) both}
 .fx-ans .qcard.pop::after,.fx-ans .qcard.shake::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;animation:fx-rim 1.1s cubic-bezier(.2,.8,.2,1) both}
-.fx-ans .qcard.pop::after{box-shadow:inset 0 0 0 1.5px rgba(52,199,89,.85),inset 0 0 48px rgba(52,199,89,.22)}
-.fx-ans .qcard.shake::after{box-shadow:inset 0 0 0 1.5px rgba(255,59,48,.85),inset 0 0 48px rgba(255,59,48,.2)}
+.fx-ans .qcard.pop::after{box-shadow:inset 0 0 0 1.5px rgba(52,199,89,.85),inset 0 0 22px rgba(52,199,89,.18)}
+.fx-ans .qcard.shake::after{box-shadow:inset 0 0 0 1.5px rgba(255,59,48,.85),inset 0 0 22px rgba(255,59,48,.16)}
 .action-bar .verdict{animation:none;position:relative;isolation:isolate}
 .fx-ans .action-bar .verdict{animation:fx-rise .65s var(--spring) both}
 .fx-ans .action-bar .verdict b{animation:fx-k .6s .05s var(--spring) both}
 .fx-ans .action-bar .verdict p,.fx-ans .action-bar > .btn,.fx-ans .action-bar > .three{animation:fx-fade .5s .14s cubic-bezier(.2,.8,.2,1) both}
-.fx-ans .action-bar:has(.verdict.good,.verdict.bad){overflow:hidden}
-.fx-ans .action-bar .verdict.good::before,.fx-ans .action-bar .verdict.bad::before{content:"";position:absolute;left:24px;top:16px;width:640px;height:640px;margin:-320px 0 0 -320px;border-radius:50%;pointer-events:none;z-index:-1;animation:fx-ripple 1.15s cubic-bezier(.2,.8,.2,1) both}
-.fx-ans .action-bar .verdict.good::before{background:radial-gradient(circle,rgba(52,199,89,.34),rgba(52,199,89,.12) 40%,rgba(52,199,89,0) 64%)}
-.fx-ans .action-bar .verdict.bad::before{background:radial-gradient(circle,rgba(255,59,48,.3),rgba(255,59,48,.1) 40%,rgba(255,59,48,0) 64%)}
+.fx-ans .action-bar .verdict.good::before,.fx-ans .action-bar .verdict.bad::before{content:"";position:absolute;inset:-12px;border-radius:26px;pointer-events:none;z-index:-1;animation:fx-glow 1.1s cubic-bezier(.2,.8,.2,1) both}
+.fx-ans .action-bar .verdict.good::before{background:radial-gradient(120% 140% at 10% 0%,rgba(52,199,89,.28),rgba(52,199,89,0) 70%)}
+.fx-ans .action-bar .verdict.bad::before{background:radial-gradient(120% 140% at 10% 0%,rgba(255,59,48,.24),rgba(255,59,48,0) 70%)}
 @keyframes fx-pop{0%{transform:scale(.96)}35%{transform:scale(1.035)}100%{transform:none}}
 @keyframes fx-shake{10%,90%{transform:translate3d(-1px,0,0)}20%,80%{transform:translate3d(3px,0,0)}30%,50%,70%{transform:translate3d(-7px,0,0)}40%,60%{transform:translate3d(7px,0,0)}}
-@keyframes fx-glow{0%{opacity:0;transform:scale(.97)}22%{opacity:1;transform:scale(1.015)}100%{opacity:0;transform:scale(1.07)}}
+@keyframes fx-glow{0%{opacity:0}22%{opacity:1}100%{opacity:0}}
 @keyframes fx-k{from{opacity:0;transform:scale(.4) rotate(-80deg)}}
-@keyframes fx-sheen{from{background-position:130% 0}to{background-position:-70% 0}}
 @keyframes fx-rim{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
 @keyframes fx-rise{from{opacity:0;transform:translate3d(0,16px,0) scale(.95)}}
 @keyframes fx-fade{from{opacity:0;transform:translate3d(0,8px,0)}}
-@keyframes fx-ripple{0%{opacity:1;transform:scale(0)}55%{opacity:.75}100%{opacity:0;transform:scale(1)}}
+/* ---------- Performance ----------
+   Unschärfe (blur) ist der teuerste Effekt: Der Browser muss dafür den Hintergrund bei jedem Scrollen neu verwischen.
+   Karten und Knöpfe im normalen Seitenfluss liegen aber nur über dem ruhigen Hintergrundverlauf (oder auf einer anderen Glaskarte),
+   dort sieht die Unschärfe genauso aus wie ohne. Sättigung und Helligkeit bleiben, damit der Glas-Ton gleich bleibt.
+   Alles, worunter Inhalt durchscrollt (Tab-Leiste, Kopfzeile, Antwort-Leiste, Inhaltsleiste, Timer, Dialoge), behält die echte Unschärfe. */
+main .glass:not(.action-bar):not(.toc):not(.toc-side):not(.timer-sheet),main .sheet{-webkit-backdrop-filter:saturate(215%) brightness(1.04);backdrop-filter:saturate(215%) brightness(1.04)}
+main .btn,main .chip,main .navbtn,main .themebtn{-webkit-backdrop-filter:saturate(180%);backdrop-filter:saturate(180%)}
+.action-bar .btn,.toc .btn,.toc .chip{-webkit-backdrop-filter:none;backdrop-filter:none}
 </style>
 </head>
 <body>
@@ -3406,7 +3408,7 @@ function render(){
     b.disabled = v !== 'list' && !a;
   });
   const cd = document.getElementById('countdown');
-  { const rs = document.documentElement.style, fc = a ? fachColor(a.fachId) : FACH_COLORS[0]; rs.setProperty('--fach', fc); rs.setProperty('--fach-rgb', rgbOf(fc)); }
+  { const rs = document.documentElement.style, fc = a ? fachColor(a.fachId) : FACH_COLORS[0]; if (rs.getPropertyValue('--fach') !== fc) { rs.setProperty('--fach', fc); rs.setProperty('--fach-rgb', rgbOf(fc)); } }
   if (a) { const f = fach(a.fachId), dt = examDate(a), future = dt && dt > new Date(); cd.innerHTML = '<i class="cd-dot"></i>' + esc(f ? f.name : a.title) + (future ? ' <b>' + esc(untilText(a)) + '</b>' : ''); }
   else cd.textContent = '';
   if (ui.view === 'list') renderList();
