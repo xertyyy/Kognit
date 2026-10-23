@@ -980,6 +980,42 @@ pre.cout{margin:0;max-height:220px;overflow:auto;white-space:pre-wrap}
   nav.tabs .bar::before, .timer-fab::before, .step.cur .node { animation: none; }
 }
 
+/* ---------- Antwort-Feedback: Motion im Liquid-Glass-Stil. Nur transform/opacity, damit es flüssig auf der GPU läuft ---------- */
+.opt{position:relative;isolation:isolate}
+.opt::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;opacity:0}
+.opt.right::after{box-shadow:0 0 0 1.5px var(--green),0 0 42px 4px rgba(52,199,89,.6)}
+.opt.wrong::after{box-shadow:0 0 0 1.5px var(--red),0 0 42px 4px rgba(255,59,48,.55)}
+.qcard.pop .opt.right{animation:fx-pop .75s var(--spring) both}
+.qcard.shake .opt.wrong{animation:fx-shake .5s cubic-bezier(.36,.07,.19,.97) both}
+.qcard.pop .opt.right::after,.qcard.shake .opt.wrong::after{animation:fx-glow 1.2s cubic-bezier(.2,.8,.2,1) both}
+.opt.right .k,.opt.wrong .k{font-size:0}
+.opt.right .k::before{content:"✓";font-size:15px;font-weight:800}
+.opt.wrong .k::before{content:"✕";font-size:13px;font-weight:800}
+.fx-ans .opt.right .k,.fx-ans .opt.wrong .k{animation:fx-k .65s var(--spring) both}
+.opts:has(.opt.right) .opt:not(.right):not(.wrong){opacity:.5;transition:opacity .45s ease}
+.fx-ans .opt.right::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:1;
+  background:linear-gradient(105deg,transparent 32%,rgba(255,255,255,.42) 47%,rgba(255,255,255,.1) 53%,transparent 68%) no-repeat;
+  background-size:240% 100%;animation:fx-sheen .95s .12s cubic-bezier(.3,.7,.2,1) both}
+.fx-ans .qcard.pop::after,.fx-ans .qcard.shake::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;animation:fx-rim 1.1s cubic-bezier(.2,.8,.2,1) both}
+.fx-ans .qcard.pop::after{box-shadow:inset 0 0 0 1.5px rgba(52,199,89,.85),inset 0 0 48px rgba(52,199,89,.22)}
+.fx-ans .qcard.shake::after{box-shadow:inset 0 0 0 1.5px rgba(255,59,48,.85),inset 0 0 48px rgba(255,59,48,.2)}
+.action-bar .verdict{animation:none;position:relative;isolation:isolate}
+.fx-ans .action-bar .verdict{animation:fx-rise .65s var(--spring) both}
+.fx-ans .action-bar .verdict b{animation:fx-k .6s .05s var(--spring) both}
+.fx-ans .action-bar .verdict p,.fx-ans .action-bar > .btn,.fx-ans .action-bar > .three{animation:fx-fade .5s .14s cubic-bezier(.2,.8,.2,1) both}
+.fx-ans .action-bar:has(.verdict.good,.verdict.bad){overflow:hidden}
+.fx-ans .action-bar .verdict.good::before,.fx-ans .action-bar .verdict.bad::before{content:"";position:absolute;left:24px;top:16px;width:640px;height:640px;margin:-320px 0 0 -320px;border-radius:50%;pointer-events:none;z-index:-1;animation:fx-ripple 1.15s cubic-bezier(.2,.8,.2,1) both}
+.fx-ans .action-bar .verdict.good::before{background:radial-gradient(circle,rgba(52,199,89,.34),rgba(52,199,89,.12) 40%,rgba(52,199,89,0) 64%)}
+.fx-ans .action-bar .verdict.bad::before{background:radial-gradient(circle,rgba(255,59,48,.3),rgba(255,59,48,.1) 40%,rgba(255,59,48,0) 64%)}
+@keyframes fx-pop{0%{transform:scale(.96)}35%{transform:scale(1.035)}100%{transform:none}}
+@keyframes fx-shake{10%,90%{transform:translate3d(-1px,0,0)}20%,80%{transform:translate3d(3px,0,0)}30%,50%,70%{transform:translate3d(-7px,0,0)}40%,60%{transform:translate3d(7px,0,0)}}
+@keyframes fx-glow{0%{opacity:0;transform:scale(.97)}22%{opacity:1;transform:scale(1.015)}100%{opacity:0;transform:scale(1.07)}}
+@keyframes fx-k{from{opacity:0;transform:scale(.4) rotate(-80deg)}}
+@keyframes fx-sheen{from{background-position:130% 0}to{background-position:-70% 0}}
+@keyframes fx-rim{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
+@keyframes fx-rise{from{opacity:0;transform:translate3d(0,16px,0) scale(.95)}}
+@keyframes fx-fade{from{opacity:0;transform:translate3d(0,8px,0)}}
+@keyframes fx-ripple{0%{opacity:1;transform:scale(0)}55%{opacity:.75}100%{opacity:0;transform:scale(1)}}
 </style>
 </head>
 <body>
@@ -3362,6 +3398,7 @@ function afterCheck(score){ ui.anim = true; ui.streak = score >= .999 ? (ui.stre
 
 /* ---------- Rahmen ---------- */
 function render(){
+  $main.classList.remove('fx-ans');
   const a = ka(ui.ka);
   document.querySelectorAll('nav.tabs button[data-view]').forEach(b => {
     const v = b.dataset.view;
@@ -4025,6 +4062,7 @@ function renderQuiz(){
     <div class="qbar">${modeSeg}${genBlock()}</div>
     ${total ? `<div class="qprog" role="progressbar" aria-label="Fortschritt der Runde" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${pos}"><i style="width:${(pos / total * 100).toFixed(1)}%"></i></div>` : ''}
     ${card}`;
+  $main.classList.toggle('fx-ans', !!(ui.anim && ui.answered));
   ui.anim = false;
   qNavInject();
   quizKeep();
@@ -4039,7 +4077,7 @@ function genBlock(){
   if (ui.sample === undefined) return '';
   const t = genTarget(); if (!t) return '';
   const hint = ui.genMsg ? esc(ui.genMsg) : (ui.qTopic === 'all' ? 'zu „' + esc(t.title) + '“' : '');
-  return `<div class="gen">${hint ? `<span>${hint}</span>` : ''}<button class="btn small ghost" data-gen ${ui.genBusy ? 'disabled' : ''}>${I.spark}${ui.genBusy ? 'Claude schreibt …' : '5 neue Fragen'}</button></div>`;
+  return `<div class="gen">${hint ? `<span>${hint}</span>` : ''}<button class="btn small ghost" data-gen ${ui.genBusy ? 'disabled' : ''}>${I.spark}${ui.genBusy ? (ui.sample ? 'Claude' : 'KI') + ' schreibt …' : '5 neue Fragen'}</button></div>`;
 }
 function summaryCard(){
   const n = ui.session.n, s = ui.session.sum, q = n ? s / n : 0;
@@ -4048,7 +4086,7 @@ function summaryCard(){
     <div class="ring-big anim">${ring([{ p:q, r:70, w:16, cls }], 170, true)}<div class="hero-center"><b><span data-count="${Math.round(q * 100)}">${Math.round(q * 100)}</span><small>%</small></b><span>${de(s)} von ${n}</span></div></div>
     <h2>${q >= .85 ? 'Stark, das sitzt!' : q >= .6 ? 'Fast geschafft' : 'Da geht noch was'}</h2>
     <p>${q >= .85 ? 'Diese Runde hast du richtig gut gemacht.' : q >= .6 ? 'Noch eine Runde, dann sitzt es.' : 'Lies die Lernseite noch einmal und versuch es dann wieder.'}</p>
-    <div class="row-actions"><button class="btn" data-restart>Noch eine Runde</button><button class="btn ghost" data-gen ${ui.genBusy ? 'disabled' : ''}>${I.spark}${ui.genBusy ? 'Claude schreibt …' : '5 neue Fragen'}</button><button class="btn ghost" data-view-go="home">Zur Übersicht</button></div></div>`;
+    <div class="row-actions"><button class="btn" data-restart>Noch eine Runde</button><button class="btn ghost" data-gen ${ui.genBusy ? 'disabled' : ''}>${I.spark}${ui.genBusy ? (ui.sample ? 'Claude' : 'KI') + ' schreibt …' : '5 neue Fragen'}</button><button class="btn ghost" data-view-go="home">Zur Übersicht</button></div></div>`;
 }
 function metaLine(q, i, n){ const t = topicOf(ui.ka, q.topic); return `<div class="qmeta"><span class="qtopic">${esc(t ? t.title : '')}</span>${q.local ? '<span class="newtag">Zufallsaufgabe</span>' : q.gen && window.claude && window.claude.use ? '<span class="newtag">von Claude</span>' : ''}${ui.view === 'quiz' && i < (ui.front || 0) ? '<span class="newtag rev-tag">Rückblick</span>' : ''}${ui.view === 'quiz' && (ui.repeat || []).includes(qKey(q)) ? '<span class="newtag rep-tag">Wiederholung</span>' : ''}<span class="qcount">${i + 1} / ${n}</span></div>`; }
 function questionCard(q){ const n = ui.deck.length; return q.t === 'mc' ? mcCard(q, n) : q.t === 'free' ? freeCard(q, n) : q.t === 'code' ? codeCard(q, n) : calcCard(q, n); }
@@ -4202,8 +4240,9 @@ function localNew(){
 }
 async function genQuestions(){
   if (ui.genBusy) return;
-  if (!ui.sample) { localNew(); return; }
   const kid = ui.ka, t = genTarget(); if (!t) return;
+  const viaKi = !ui.sample && kiOn() && !t.calcKind;
+  if (!ui.sample && !viaKi) { localNew(); return; }
   ui.genBusy = true; ui.genMsg = ''; render();
   const existing = poolOf(kid).filter(q => q.topic === t.id).map(q => q.q || q.title || '').slice(0, 40).join(' | ');
   const prompt = `Du erstellst Übungsaufgaben für eine Klassenarbeit an einer kaufmännischen Berufsschule in Deutschland. Die Person fängt fast bei null an: einfache, klare Sprache, Du-Form, keine Fangfragen.
@@ -4215,16 +4254,16 @@ ${FORMAT_SPEC}
 ${t.calcKind ? CALC_SPEC(t.calcKind) : ''}
 Prüfe jede Zahl doppelt. Wiederhole diese vorhandenen Aufgaben nicht: ${existing}`;
   try {
-    const arr = await ui.sample.json(prompt, { cache:false });
+    const arr = viaKi ? (await ki('questions', { title:t.title, page:plain(t.html || t.facts || '').slice(0, 8000), existing })).items : await ui.sample.json(prompt, { cache:false });
     const added = cleanQuestions(arr, t);
-    if (!added.length) ui.genMsg = 'Claude hat keine brauchbaren Aufgaben geliefert. Probier es noch einmal.';
+    if (!added.length) ui.genMsg = (viaKi ? 'Die KI' : 'Claude') + ' hat keine brauchbaren Aufgaben geliefert. Probier es noch einmal.';
     else {
       const c = C[kid]; c.gen = c.gen.concat(added); capContent(c); persist('ka-' + kid, c);
       ui.deck = byLevel(shuffle(added).concat(ui.deck.slice(Math.min(ui.idx, ui.deck.length))).slice(0, QUIZ_N));
       ui.idx = 0; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null;
       ui.genMsg = added.length + ' neue Aufgaben stehen jetzt vorne.';
     }
-  } catch(e) { ui.genMsg = errText(e); }
+  } catch(e) { ui.genMsg = viaKi ? e.message : errText(e); }
   ui.genBusy = false; render();
 }
 function errText(e){
