@@ -936,6 +936,37 @@ nav.tabs button[aria-current="page"] svg{transform:scale(1.1)}
   nav.tabs .bar button{font-size:7.5px;letter-spacing:-.03em}
 }
 
+.codein{font-family:var(--mono);font-size:14px;line-height:1.5;min-height:170px;tab-size:4;white-space:pre;overflow-x:auto}
+.code-tests{display:grid;gap:8px;margin-top:12px}
+.ctest{padding:10px 12px;border-radius:14px;background:var(--fill2);display:grid;gap:4px;font-size:14px}
+.ctest b small{font-weight:500;color:var(--label2);margin-left:6px}
+.ctest.ok b{color:var(--green)} .ctest.bad b{color:var(--red,#FF3B30)}
+.ctest span{color:var(--label2);line-height:1.4}
+.code-try{margin-top:12px}
+pre.cout{margin:0;max-height:220px;overflow:auto;white-space:pre-wrap}
+.cerr{margin:6px 0 0;color:var(--red,#FF3B30);font-size:14px}
+.ai-fb{white-space:pre-wrap}
+.rep-tag{background:rgba(255,159,10,.16);color:#C25E00}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .rep-tag{color:#FFB340}}
+:root[data-theme="dark"] .rep-tag{color:#FFB340}
+.extimer{font-variant-numeric:tabular-nums}
+.extimer.warn{background:rgba(255,59,48,.16);color:var(--red,#FF3B30)}
+.chat{padding:0;overflow:hidden}
+.chatlist{height:min(58vh,560px);overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;overscroll-behavior:contain}
+.chat-empty{margin:auto;text-align:center}
+.cmsg{display:flex}
+.cmsg.me{justify-content:flex-end}
+.cbub{max-width:80%;padding:8px 12px;border-radius:18px;background:var(--fill2)}
+.cmsg.me .cbub{background:rgba(var(--acc-rgb),.18)}
+.cmeta{margin:0 0 2px;font-size:12px;color:var(--label2);display:flex;align-items:center;gap:6px}
+.cmeta b{color:var(--label)}
+.cdel{margin-left:auto;border:0;background:none;color:var(--label3);font-size:16px;line-height:1;cursor:pointer;padding:0 2px}
+.ctext{margin:0;font-size:15px;line-height:1.4;color:var(--label);white-space:pre-wrap;overflow-wrap:anywhere}
+.chatbar{display:flex;align-items:flex-end;gap:8px}
+.chatbar{display:flex !important;align-items:flex-end;gap:8px}
+.chatbar textarea{flex:1 1 auto;width:auto;min-width:0;min-height:44px;max-height:140px;resize:none;margin:0}
+.chatbar .btn{flex:0 0 auto;width:auto}
+
 /* ---------- Handy: flüssiger ---------- */
 @media (hover: none), (pointer: coarse) {
   /* Karten ohne Live-Unschärfe: auf dem Handy der größte Bremsklotz */
@@ -1934,6 +1965,278 @@ function renderLogin(){
     </div></div>`;
 }
 
+/* ===================== Code-Aufgaben: Python läuft im Browser (Pyodide) ===================== */
+const PY_URL = 'https://cdn.jsdelivr.net/pyodide/v0.27.7/full/';
+const AI_URL = '';   // Adresse des Cloudflare-Workers für KI-Feedback (leer = aus)
+/* Aufgaben je Thema (Zuordnung über den Thementitel). Prüfung: Programm läuft mit den Eingaben,
+   die Ausgabe muss die erwarteten Werte enthalten (has), darf bestimmte nicht enthalten (not)
+   oder muss genau diese Zeilen haben (lines). use = Pflicht-Baustein im Code. */
+const CODE_TASKS = {
+  'Grundlagen': [
+    { id:'c-gr-1', q:'Lege die Variablen name mit dem Wert "Lea" und alter mit dem Wert 17 an und gib beide mit print() aus.',
+      starter:'# Variablen anlegen\n\n# beide ausgeben\n', tests:[{ in:[], has:['Lea', '17'] }], use:[['=', 'Du sollst Variablen mit = anlegen.']],
+      m:'name = "Lea"\nalter = 17\nprint(name, alter)' },
+    { id:'c-gr-2', q:'Ein Artikel kostet 4.5 €. Speichere den Preis f\u00fcr 3 St\u00fcck in einer Variable gesamt und gib gesamt aus.',
+      starter:'preis = 4.5\n# gesamt berechnen und ausgeben\n', tests:[{ in:[], has:['13.5'] }], use:[['gesamt', 'Nutze eine Variable mit dem Namen gesamt.']],
+      m:'preis = 4.5\ngesamt = preis * 3\nprint(gesamt)' }
+  ],
+  'Ein- und Ausgabe': [
+    { id:'c-io-1', q:'Lies mit input() zwei ganze Zahlen ein und gib ihre Summe aus.',
+      starter:'a = input("Erste Zahl: ")\nb = input("Zweite Zahl: ")\n# Summe ausgeben\n', tests:[{ in:['3', '4'], has:['7'], not:['34'] }, { in:['10', '25'], has:['35'], not:['1025'] }],
+      m:'a = int(input("Erste Zahl: "))\nb = int(input("Zweite Zahl: "))\nprint(a + b)' },
+    { id:'c-io-2', q:'Lies einen Nettopreis (Kommazahl) ein und gib den Preis mit 19 % MwSt. mit genau zwei Nachkommastellen aus, z. B. 11.90.',
+      starter:'netto = input("Nettopreis: ")\n# Bruttopreis mit 2 Nachkommastellen ausgeben\n', tests:[{ in:['10'], has:['11.90'] }, { in:['100'], has:['119.00'] }],
+      m:'netto = float(input("Nettopreis: "))\nbrutto = netto * 1.19\nprint(f"{brutto:.2f}")' }
+  ],
+  'Entscheidungen': [
+    { id:'c-en-1', q:'Lies ein Alter ein. Gib \u201evollj\u00e4hrig\u201c aus, wenn das Alter mindestens 18 ist, sonst \u201eminderj\u00e4hrig\u201c.',
+      starter:'alter = int(input("Alter: "))\n', tests:[{ in:['18'], has:['vollj\u00e4hrig'], not:['minderj\u00e4hrig'] }, { in:['17'], has:['minderj\u00e4hrig'] }, { in:['40'], has:['vollj\u00e4hrig'], not:['minderj\u00e4hrig'] }],
+      use:[['if', 'Nutze eine if-Abfrage.']], m:'alter = int(input("Alter: "))\nif alter >= 18:\n    print("vollj\u00e4hrig")\nelse:\n    print("minderj\u00e4hrig")' },
+    { id:'c-en-2', q:'Lies eine Punktzahl ein: ab 90 \u201esehr gut\u201c, ab 70 \u201egut\u201c, sonst \u201eweiter \u00fcben\u201c.',
+      starter:'punkte = int(input("Punkte: "))\n', tests:[{ in:['95'], has:['sehr gut'] }, { in:['75'], has:['gut'], not:['sehr gut', 'weiter'] }, { in:['40'], has:['weiter \u00fcben'], not:['gut'] }],
+      use:[['elif', 'Nutze if, elif und else.']], m:'punkte = int(input("Punkte: "))\nif punkte >= 90:\n    print("sehr gut")\nelif punkte >= 70:\n    print("gut")\nelse:\n    print("weiter \u00fcben")' }
+  ],
+  'Logik und Mehrfachauswahl': [
+    { id:'c-lo-1', q:'Lies ein Alter und ob ein Ticket da ist (j oder n) ein. Gib \u201eEinlass\u201c aus, wenn das Alter mindestens 16 ist und das Ticket j ist, sonst \u201eKein Einlass\u201c.',
+      starter:'alter = int(input("Alter: "))\nticket = input("Ticket (j/n): ")\n', tests:[{ in:['17', 'j'], has:['Einlass'], not:['Kein'] }, { in:['15', 'j'], has:['Kein Einlass'] }, { in:['20', 'n'], has:['Kein Einlass'] }],
+      use:[['and', 'Verbinde die Bedingungen mit and.']], m:'alter = int(input("Alter: "))\nticket = input("Ticket (j/n): ")\nif alter >= 16 and ticket == "j":\n    print("Einlass")\nelse:\n    print("Kein Einlass")' },
+    { id:'c-lo-2', q:'Lies eine Zahl ein und gib mit match-case aus: 1 \u2192 \u201eStart\u201c, 2 \u2192 \u201ePause\u201c, 3 \u2192 \u201eEnde\u201c, alles andere \u2192 \u201eUng\u00fcltig\u201c.',
+      starter:'zahl = int(input("Zahl: "))\n', tests:[{ in:['2'], has:['Pause'] }, { in:['3'], has:['Ende'] }, { in:['9'], has:['Ung\u00fcltig'] }],
+      use:[['match', 'Nutze match-case.'], ['case _', 'Denk an case _ f\u00fcr alles andere.']], m:'zahl = int(input("Zahl: "))\nmatch zahl:\n    case 1:\n        print("Start")\n    case 2:\n        print("Pause")\n    case 3:\n        print("Ende")\n    case _:\n        print("Ung\u00fcltig")' }
+  ],
+  'for-Schleife': [
+    { id:'c-fo-1', q:'Gib mit einer for-Schleife die Zahlen von 1 bis 5 aus, jede in einer eigenen Zeile.',
+      starter:'', tests:[{ in:[], lines:['1', '2', '3', '4', '5'] }], use:[['for', 'Nutze eine for-Schleife.']], m:'for i in range(1, 6):\n    print(i)' },
+    { id:'c-fo-2', q:'Lies eine Zahl n ein und berechne mit einer for-Schleife die Summe von 1 bis n. Gib nur die Summe aus.',
+      starter:'n = int(input("n: "))\nsumme = 0\n', tests:[{ in:['4'], has:['10'] }, { in:['10'], has:['55'] }],
+      use:[['for', 'Nutze eine for-Schleife.']], m:'n = int(input("n: "))\nsumme = 0\nfor i in range(1, n + 1):\n    summe += i\nprint(summe)' }
+  ],
+  'Verschachtelte Schleifen und Fehler': [
+    { id:'c-ve-1', q:'Gib mit zwei verschachtelten for-Schleifen alle Paare aus i = 1 bis 2 und j = 1 bis 3 aus, jedes als \u201ei j\u201c in einer eigenen Zeile (6 Zeilen).',
+      starter:'', tests:[{ in:[], lines:['1 1', '1 2', '1 3', '2 1', '2 2', '2 3'] }], use:[['for[\\s\\S]*for', 'Nutze zwei verschachtelte for-Schleifen.', true]],
+      m:'for i in range(1, 3):\n    for j in range(1, 4):\n        print(i, j)' },
+    { id:'c-ve-2', q:'Der Code soll 3-mal \u201eHallo\u201c ausgeben, hat aber zwei Fehler. Korrigiere ihn.',
+      starter:'for i in range(3)\nprint("Hallo")\n', tests:[{ in:[], lines:['Hallo', 'Hallo', 'Hallo'] }],
+      m:'for i in range(3):\n    print("Hallo")' }
+  ]
+};
+const codeCache = {};
+function codeTasksFor(id){
+  const ts = topicsOf(id); if (!ts.length) return [];
+  const key = id + ':' + ts.map(t => t.title).join('|');
+  if (codeCache[key]) return codeCache[key];
+  const out = [];
+  ts.forEach(t => (CODE_TASKS[t.title] || []).forEach(c => out.push(Object.assign({ t:'code', topic:t.id }, c))));
+  return (codeCache[key] = out);
+}
+/* Python-Arbeiter: läuft getrennt, damit Endlosschleifen abgebrochen werden können */
+const py = { w:null, ready:null, seq:0, wait:{} };
+function pyWorker(){
+  if (py.w) return py.ready;
+  const src = `importScripts(${JSON.stringify(PY_URL + 'pyodide.js')});
+let P; const ready = loadPyodide({ indexURL:${JSON.stringify(PY_URL)} }).then(x => { P = x; postMessage({ ready:true }); }, e => postMessage({ fail:String(e) }));
+onmessage = async e => {
+  await ready; const { id, code, input } = e.data; const lines = input.slice(); let out = '';
+  P.setStdin({ stdin: () => lines.length ? lines.shift() : undefined, autoEOF:true });
+  P.setStdout({ write: b => { out += new TextDecoder().decode(b); return b.length; } });
+  P.setStderr({ write: b => { out += new TextDecoder().decode(b); return b.length; } });
+  let err = null; const g = P.globals.get('dict')();
+  try { await P.runPythonAsync(code, { globals:g }); } catch (x) { err = String(x && x.message || x); }
+  try { g.destroy(); } catch (x) {}
+  postMessage({ id, out, err });
+};`;
+  py.w = new Worker(URL.createObjectURL(new Blob([src], { type:'text/javascript' })));
+  py.ready = new Promise((res, rej) => {
+    const t = setTimeout(() => rej(new Error('Python l\u00e4dt zu lange. Pr\u00fcf deine Internetverbindung.')), 90000);
+    py.w.onmessage = e => {
+      const d = e.data;
+      if (d.ready) { clearTimeout(t); res(); return; }
+      if (d.fail) { clearTimeout(t); rej(new Error('Python konnte nicht geladen werden.')); return; }
+      const cb = py.wait[d.id]; if (cb) { delete py.wait[d.id]; cb(d); }
+    };
+  });
+  py.ready.catch(() => { if (py.w) py.w.terminate(); py.w = null; });
+  return py.ready;
+}
+async function pyRun(code, input){
+  await pyWorker();
+  const id = ++py.seq;
+  return new Promise(res => {
+    const t = setTimeout(() => { delete py.wait[id]; if (py.w) py.w.terminate(); py.w = null; res({ out:'', err:'TIMEOUT' }); }, 6000);
+    py.wait[id] = d => { clearTimeout(t); res(d); };
+    py.w.postMessage({ id, code, input });
+  });
+}
+function pyErr(err){
+  if (!err) return '';
+  if (err === 'TIMEOUT') return 'Dein Programm l\u00e4uft zu lange. Hast du eine Endlosschleife?';
+  const lines = String(err).trim().split('\n'), last = lines[lines.length - 1] || '';
+  const ln = (String(err).match(/File "<exec>", line (\d+)/g) || String(err).match(/line (\d+)/g) || []).pop();
+  const where = ln ? ' (Zeile ' + ln.replace(/\D/g, '') + ')' : '';
+  if (/EOFError/.test(last)) return 'Dein Programm liest mit input() \u00f6fter ein, als es Eingaben gibt.';
+  if (/expected ':'/.test(last)) return 'Da fehlt ein Doppelpunkt' + where + '.';
+  if (/IndentationError/.test(last)) return 'Die Einr\u00fcckung stimmt nicht' + where + '. Was zur Schleife oder zum if geh\u00f6rt, muss einger\u00fcckt sein.';
+  if (/NameError/.test(last)) return 'Ein Name ist unbekannt' + where + ': ' + last.replace(/^NameError:\s*/, '') + '. Tippfehler oder Variable noch nicht angelegt?';
+  if (/TypeError/.test(last) && /str/.test(last)) return 'Text und Zahl passen hier nicht zusammen' + where + '. Hast du int() oder float() vergessen?';
+  if (/ValueError/.test(last) && /invalid literal/.test(last)) return 'int() konnte die Eingabe nicht in eine Zahl umwandeln' + where + '. Nimm float() f\u00fcr Kommazahlen.';
+  if (/SyntaxError/.test(last)) return 'Syntaxfehler' + where + ': ' + last.replace(/^SyntaxError:\s*/, '');
+  return last + where;
+}
+function outHas(out, x){
+  const o = out.toLowerCase(), v = String(x).toLowerCase();
+  if (/^-?\d+(\.\d+)?$/.test(v)) return new RegExp('(^|[^0-9.])' + v.replace('.', '\\.') + '(?![0-9])').test(o);
+  return o.includes(v);
+}
+async function runCodeTests(q, code){
+  const res = [];
+  for (const u of q.use || []) {
+    const ok = u[2] ? new RegExp(u[0]).test(code) : code.includes(u[0]);
+    if (!ok) return { score:0, results:[{ ok:false, why:u[1] }], useFail:true };
+  }
+  for (const t of q.tests) {
+    const r = await pyRun(code, t.in || []), out = (r.out || '').replace(/\r/g, '');
+    let ok = !r.err, why = pyErr(r.err);
+    if (ok && t.has) { const miss = t.has.filter(x => !outHas(out, x)); if (miss.length) { ok = false; why = 'Erwartet wurde \u201e' + miss.join('\u201c, \u201e') + '\u201c in der Ausgabe.'; } }
+    if (ok && t.not) { const bad = t.not.filter(x => outHas(out, x)); if (bad.length) { ok = false; why = '\u201e' + bad.join('\u201c, \u201e') + '\u201c sollte hier nicht ausgegeben werden.'; } }
+    if (ok && t.lines) { const got = out.split('\n').map(x => x.trim()).filter(Boolean); if (got.join('\n') !== t.lines.join('\n')) { ok = false; why = 'Die Ausgabe soll genau so aussehen: ' + t.lines.join(' | '); } }
+    res.push({ ok, why, input:t.in || [], out:out.slice(0, 600) });
+  }
+  const n = res.filter(r => r.ok).length;
+  return { score:Math.round(n / res.length * 100) / 100, results:res };
+}
+function codeCard(q, n){
+  const r = ui.codeRes, code = ui.resp.code != null ? ui.resp.code : (q.starter || '');
+  const running = ui.codeBusy;
+  const tests = r && r.results ? `<div class="code-tests">${r.results.map((t, i) => `<div class="ctest ${t.ok ? 'ok' : 'bad'}"><b>${t.ok ? '\u2713' : '\u2717'} ${r.useFail ? 'Vorgabe' : 'Test ' + (i + 1)}${t.input && t.input.length ? ' <small>Eingabe: ' + esc(t.input.join(', ')) + '</small>' : ''}</b>${t.why ? `<span>${esc(t.why)}</span>` : ''}${!t.ok && t.out ? `<pre class="code cout">${esc(t.out)}</pre>` : ''}</div>`).join('')}</div>` : '';
+  const tryOut = ui.codeTry ? `<div class="code-try"><p class="hint" style="margin:0 0 4px">Ausgabe${ui.codeTry.input.length ? ' mit Eingabe ' + esc(ui.codeTry.input.join(', ')) : ''}</p><pre class="code cout">${esc(ui.codeTry.out || '') || '<span class="muted">(keine Ausgabe)</span>'}</pre>${ui.codeTry.err ? `<p class="cerr">${esc(pyErr(ui.codeTry.err))}</p>` : ''}</div>` : '';
+  const ai = r && r.ai ? `<div class="feedback ai-fb"><b>KI-Feedback</b>${esc(r.ai)}</div>` : '';
+  const aiBtn = ui.answered && AI_URL && fb.user && !(r && r.ai) ? `<button class="btn small ghost" data-codeai ${ui.codeAiBusy ? 'disabled' : ''}>${ui.codeAiBusy ? 'KI denkt nach \u2026' : '\u2728 KI-Feedback zu meinem Code'}</button>` : '';
+  const sol = ui.answered ? `<div class="feedback"><b>Beispiel-L\u00f6sung</b><pre class="code">${esc(q.m)}</pre></div>` : '';
+  let bar;
+  if (ui.answered) { const sc = r ? r.score : 0; bar = `<div class="verdict ${sc >= .999 ? 'good' : sc > 0 ? 'mid' : 'bad'}"><b>${sc >= .999 ? 'Alle Tests bestanden!' : sc > 0 ? 'Teilweise richtig' : 'Noch nicht richtig'}</b></div><button class="btn big" data-nextq>Weiter</button>`; }
+  else bar = `<div class="two"><button class="btn ghost" data-coderun ${running ? 'disabled' : ''}>\u25b6 Ausprobieren</button><button class="btn" data-codecheck ${running ? 'disabled' : ''}>${running ? 'L\u00e4uft \u2026' : 'Pr\u00fcfen'}</button></div>`;
+  return `<div class="glass qcard">${metaLine(q, ui.idx, n)}<p class="qkind">Code schreiben</p><p class="qtext">${esc(q.q)}</p>${hintUI()}
+    <textarea class="free codein" data-f="code" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="Dein Python-Code" ${ui.answered || running ? 'readonly' : ''}>${esc(code)}</textarea>
+    ${running && !py.w ? '<p class="hint" style="margin:6px 0 0">Python wird beim ersten Mal geladen, das dauert ein paar Sekunden \u2026</p>' : ''}
+    ${tryOut}${tests}${sol}${ai}${aiBtn ? `<div style="margin-top:10px">${aiBtn}</div>` : ''}</div>
+    <div class="glass action-bar${ui.answered ? ' flow' : ''}">${bar}</div>`;
+}
+async function codeTry(){
+  const q = ui.deck[ui.idx]; if (!q || ui.codeBusy) return;
+  const code = ui.resp.code != null ? ui.resp.code : (q.starter || ''), input = (q.tests[0] && q.tests[0].in) || [];
+  ui.codeBusy = true; render();
+  try { const r = await pyRun(code, input); ui.codeTry = { input, out:r.out, err:r.err }; }
+  catch(e) { toast(e.message || 'Python konnte nicht gestartet werden.'); }
+  ui.codeBusy = false; render();
+}
+async function codeCheck(){
+  const q = ui.deck[ui.idx]; if (!q || ui.codeBusy || ui.answered) return;
+  const code = ui.resp.code != null ? ui.resp.code : (q.starter || '');
+  if (!code.trim()) { toast('Schreib zuerst deinen Code.'); return; }
+  ui.codeBusy = true; render();
+  let r;
+  try { r = await runCodeTests(q, code); }
+  catch(e) { ui.codeBusy = false; render(); toast(e.message || 'Python konnte nicht gestartet werden.'); return; }
+  ui.codeBusy = false; ui.codeTry = null; ui.codeRes = r; ui.answered = true; ui.lastScore = r.score;
+  ui.session.n++; ui.session.sum += r.score;
+  markResult(q, r.score); record(q.topic, r.score); classAnswer(q, q.topic, r.score); afterCheck(r.score); qSave(); render();
+}
+async function codeAi(){
+  const q = ui.deck[ui.idx], r = ui.codeRes; if (!q || !r || !AI_URL || !fb.user || ui.codeAiBusy) return;
+  ui.codeAiBusy = true; render();
+  try {
+    const token = await fb.user.getIdToken();
+    const resp = await fetch(AI_URL, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
+      body:JSON.stringify({ task:q.q, code:String(ui.resp.code || '').slice(0, 4000), tests:r.results.map(t => ({ ok:t.ok, why:t.why || '' })) }) });
+    const d = await resp.json().catch(() => ({}));
+    if (!resp.ok || !d.text) throw new Error(d.error || 'Die KI hat gerade keine Zeit. Versuch es sp\u00e4ter noch einmal.');
+    r.ai = String(d.text).slice(0, 1500); qSave();
+  } catch(e) { toast(e.message || 'Das hat nicht geklappt.'); }
+  ui.codeAiBusy = false; render();
+}
+
+/* ===================== Fehler-Wiederholung ===================== */
+function qKey(q){ return String(q.id || ((q.q || '') + '|' + (q.code || ''))).slice(0, 120); }
+function markResult(q, sc){
+  try {
+    const p = P[ui.ka]; if (!p || !q) return;
+    p.wrong = p.wrong || {}; const k = qKey(q);
+    if (sc < .999) p.wrong[k] = Math.min(3, (p.wrong[k] || 0) + 1);
+    else if (p.wrong[k]) { p.wrong[k]--; if (!p.wrong[k]) delete p.wrong[k]; }
+  } catch(e) {}
+}
+
+/* ===================== Klassenchat ===================== */
+const chat = { unsub:null, cid:null, msgs:[], sending:false };
+function chatStop(){ if (chat.unsub) { try { chat.unsub(); } catch(e) {} } chat.unsub = null; chat.cid = null; }
+function chatStart(){
+  const cid = myClass(); if (!fb.user || !cid) return;
+  if (chat.unsub && chat.cid === cid) return;
+  chatStop(); chat.cid = cid; chat.msgs = null;
+  chat.unsub = fb.fs.collection('classes/' + cid + '/chat').orderBy('at', 'desc').limit(80).onSnapshot(snap => {
+    const arr = []; snap.forEach(d => { const x = d.data({ serverTimestamps:'estimate' }) || {}; arr.push({ id:d.id, uid:x.uid, name:String(x.name || '?'), text:String(x.text || ''), at:tsMs(x.at) || Date.now() }); });
+    chat.msgs = arr.reverse(); paintChat();
+  }, () => { chat.msgs = chat.msgs || []; paintChat(true); });
+}
+function chatTime(ms){
+  const d = new Date(ms), now = new Date(), same = d.toDateString() === now.toDateString();
+  return (same ? '' : d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit' }) + ', ') + d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+}
+function chatListHtml(fail){
+  if (fail) return '<p class="hint chat-empty">Der Chat konnte nicht geladen werden. Pr\u00fcf die Firestore-Regeln.</p>';
+  if (!chat.msgs) return '<p class="hint chat-empty">L\u00e4dt \u2026</p>';
+  if (!chat.msgs.length) return '<p class="hint chat-empty">Noch keine Nachrichten. Schreib die erste!</p>';
+  const me = fb.user && fb.user.uid;
+  return chat.msgs.map(m => `<div class="cmsg ${m.uid === me ? 'me' : ''}"><div class="cbub"><p class="cmeta"><b>${esc(m.name)}</b> <span>${chatTime(m.at)}</span>${m.uid === me || isAdmin() ? `<button class="cdel" data-chatdel="${esc(m.id)}" aria-label="Nachricht l\u00f6schen">\u00d7</button>` : ''}</p><p class="ctext">${esc(m.text)}</p></div></div>`).join('');
+}
+function paintChat(fail){
+  const box = document.getElementById('chatlist'); if (!box || ui.view !== 'chat') return;
+  const near = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+  box.innerHTML = chatListHtml(fail);
+  if (near || !box.dataset.init) { box.scrollTop = box.scrollHeight; box.dataset.init = '1'; }
+}
+function renderChat(){
+  const cid = myClass();
+  if (!fb.user || !cid) {
+    $main.innerHTML = `<div class="lt"><h1>Klassenchat</h1></div><div class="glass pad"><p style="margin:0">Der Klassenchat ist f\u00fcr angemeldete Mitglieder einer Klasse. ${fb.user ? 'W\u00e4hl im Profil deine Klasse.' : 'Melde dich im Profil an und w\u00e4hl deine Klasse.'}</p></div>`;
+    return;
+  }
+  $main.innerHTML = `<div class="lt"><h1>Klassenchat</h1></div><p class="sub">${esc(className(cid))} \u00b7 Sei nett zueinander. Der Admin kann Nachrichten l\u00f6schen.</p>
+    <div class="glass chat"><div id="chatlist" class="chatlist" aria-live="polite">${chatListHtml()}</div></div>
+    <div class="glass action-bar chatbar"><textarea id="chatin" class="free" maxlength="500" rows="1" placeholder="Nachricht an ${esc(className(cid))} \u2026" aria-label="Nachricht"></textarea><button class="btn" data-chatsend ${chat.sending ? 'disabled' : ''}>Senden</button></div>`;
+  chatStart(); paintChat();
+}
+async function chatSend(){
+  const inp = document.getElementById('chatin'), cid = myClass();
+  const text = (inp && inp.value || '').trim().slice(0, 500);
+  if (!text || !fb.user || !cid || chat.sending) return;
+  chat.sending = true;
+  try {
+    const ref = fb.fs.collection('classes/' + cid + '/chat').doc(), now = firebase.firestore.FieldValue.serverTimestamp();
+    const b = fb.fs.batch();
+    b.set(ref, { uid:fb.user.uid, name:String((M.profile && M.profile.name) || 'Unbekannt').slice(0, 30) || 'Unbekannt', text, at:now });
+    b.set(fb.fs.doc('classes/' + cid + '/chatlimit/' + fb.user.uid), { lastAt:now, lastId:ref.id });
+    await b.commit();
+    if (inp) { inp.value = ''; inp.style.height = ''; inp.focus(); }
+  } catch(e) { toast('Nicht gesendet. Warte kurz: h\u00f6chstens eine Nachricht alle 5 Sekunden.'); }
+  chat.sending = false;
+}
+async function chatDel(id){
+  const cid = myClass(); if (!fb.user || !cid || !id) return;
+  if (!(await dialog('Nachricht l\u00f6schen?', { ok:'L\u00f6schen', danger:true }))) return;
+  try { await fb.fs.doc('classes/' + cid + '/chat/' + id).delete(); } catch(e) { toast('L\u00f6schen hat nicht geklappt.'); }
+}
+
+/* ===================== Prüfung mit Zeitlimit ===================== */
+function examLeft(){ const ex = ui.exam; return ex && ex.phase === 'run' && ex.deadline ? Math.max(0, ex.deadline - Date.now()) : null; }
+function examClock(ms){ const s = Math.ceil(ms / 1000), m = Math.floor(s / 60); return m + ':' + String(s % 60).padStart(2, '0'); }
+setInterval(() => {
+  const left = examLeft(); if (left == null) return;
+  const el = document.getElementById('extimer');
+  if (el) { el.textContent = '\u23f1 ' + examClock(left); el.classList.toggle('warn', left <= 5 * 60000); }
+  if (left <= 0 && ui.exam.phase === 'run') { try { examStore(); } catch(e) {} toast('Die Zeit ist um. Deine Pr\u00fcfung wurde abgegeben.'); finishExam(); }
+}, 1000);
+
 /* ---------- Klassen, nächste Klassenarbeit und Leaderboard (nur Website mit Konto) ---------- */
 const ADMIN_UID = '8rNNSHVDDsRgg5XpixdJZwH6Abn2';
 const DEFAULT_CLASSES = [{ id:'efs225', name:'EFS 225' }];
@@ -2096,13 +2399,14 @@ function classCardHtml(){
   return `<section style="${fachStyle(a.fachId)}"><h2 class="group-title"><i class="fdot" aria-hidden="true"></i>Nächste Klassenarbeit · ${esc(cls.info.name)}</h2>
     <div class="glass list classcard">${kaRow(a)}
       <div class="cc-board"><p class="cc-head">Leaderboard <small>Bereit-% aus dem Quiz, freie Antworten zählen nicht</small></p>${boardHtml(3)}</div>
-      <button class="row add" data-open="${a.id}"><span class="add-ic">→</span><span class="row-title">Ganzes Leaderboard ansehen</span></button></div></section>`;
+      <button class="row add" data-open="${a.id}"><span class="add-ic">→</span><span class="row-title">Ganzes Leaderboard ansehen</span></button>
+      <button class="row add" data-view-go="chat"><span class="add-ic">💬</span><span class="row-title">Klassenchat</span></button></div></section>`;
 }
 function classSectionHtml(){
   if (!fb.user) return '';
   const cid = myClass();
   return `<section><h2 class="group-title">Klasse</h2>
-    <div class="glass list"><button class="row add" data-classpick><span class="add-ic">🎓</span><span class="row-title">${cid ? esc(className(cid)) + ' · ' + esc((M.profile && M.profile.name) || '') : 'Klasse auswählen'}</span></button></div>
+    <div class="glass list">${cid ? '<button class="row add" data-view-go="chat"><span class="add-ic">💬</span><span class="row-title">Klassenchat</span></button>' : ''}<button class="row add" data-classpick><span class="add-ic">🎓</span><span class="row-title">${cid ? esc(className(cid)) + ' · ' + esc((M.profile && M.profile.name) || '') : 'Klasse auswählen'}</span></button></div>
     <p class="footnote">Dein Vorname und dein Bereit-% bei der nächsten Klassenarbeit sind für deine Klasse im Leaderboard sichtbar.<br>Nutzer-ID: <code>${esc(fb.user.uid)}</code></p></section>`;
 }
 function adminSectionHtml(){
@@ -2459,7 +2763,7 @@ function poolOf(id){
   const tids = new Set(topicsOf(id).map(t => t.id));
   const unl = new Set((P[id] && P[id].bank) || []);
   const base = a.builtin ? FIXED.concat(FREE_BUILTIN, BANK.filter(q => unl.has(q.id))) : [];
-  return base.concat((C[id] && C[id].gen) || []).filter(q => tids.has(q.topic));
+  return base.concat((C[id] && C[id].gen) || [], codeTasksFor(id)).filter(q => tids.has(q.topic));
 }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const eur = v => (v < 0 ? '−' : '') + Math.abs(v).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' €';
@@ -2626,12 +2930,12 @@ document.addEventListener('keydown', e => {
 document.addEventListener('mouseup', e => { if (e.button === 3) { e.preventDefault(); navGo(-1); } else if (e.button === 4) { e.preventDefault(); navGo(1); } });
 
 /* Quiz: vorherige und nächste Frage */
-function qSnap(){ return { sel:ui.sel, resp:Object.assign({}, ui.resp), freeRes:ui.freeRes, lastScore:ui.lastScore, answered:ui.answered }; }
+function qSnap(){ return { sel:ui.sel, resp:Object.assign({}, ui.resp), freeRes:ui.freeRes, lastScore:ui.lastScore, answered:ui.answered, codeRes:ui.codeRes || null }; }
 function qSave(){ ui.qlog = ui.qlog || []; ui.qlog[ui.idx] = qSnap(); }
 function qLoad(i){
   const h = (ui.qlog && ui.qlog[i]) || (ui.draft && ui.draft.i === i ? ui.draft.s : null);
   ui.answered = h ? !!h.answered : false; ui.sel = h ? h.sel : null; ui.resp = h ? Object.assign({}, h.resp) : {};
-  ui.freeRes = h ? h.freeRes : null; ui.lastScore = h ? h.lastScore : 0; ui.anim = false;
+  ui.freeRes = h ? h.freeRes : null; ui.lastScore = h ? h.lastScore : 0; ui.anim = false; ui.codeRes = h && h.codeRes ? h.codeRes : null; ui.codeTry = null;
 }
 function qGo(dir){
   if (ui.grading) return;
@@ -3041,6 +3345,7 @@ function render(){
   else if (ui.view === 'login') renderLogin();
   else if (ui.view === 'settings') renderSettings();
   else if (ui.view === 'admin') renderAdmin();
+  else if (ui.view === 'chat') renderChat();
   else if (!a) { ui.view = 'list'; renderList(); }
   else if (ui.view === 'home') renderHome();
   else if (ui.view === 'kb') renderKb();
@@ -3049,6 +3354,7 @@ function render(){
   { const sf = document.getElementById('setfab'); if (sf) { const on = ui.view === 'settings' || ui.view === 'login' || ui.view === 'admin'; sf.classList.toggle('on', on); sf.setAttribute('aria-current', on ? 'page' : 'false'); } }
   enhance(); moveLens(); observeTitle(); countUp();
   try { classRefresh(); } catch(e) {}
+  if (ui.view !== 'chat' && chat.unsub) chatStop();
   saveUi();
 }
 function renderSync(){
@@ -3627,23 +3933,32 @@ function kbArticle(t){
 }
 
 /* ---------- Quiz ---------- */
-function startDeck(){ ui.deckKa = ui.ka; const pool = poolOf(ui.ka); ui.deck = shuffle(ui.qTopic === 'all' ? pool : pool.filter(q => q.topic === ui.qTopic)).slice(0, QUIZ_N); ui.idx = 0; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null; ui.session = { n:0, sum:0 }; ui.summaryDone = false; }
+function buildDeck(pool){
+  const wrong = (P[ui.ka] && P[ui.ka].wrong) || {};
+  const rep = shuffle(pool.filter(q => wrong[qKey(q)])).sort((a, b) => wrong[qKey(b)] - wrong[qKey(a)]).slice(0, 2);
+  const rest = shuffle(pool.filter(q => !rep.includes(q)));
+  let deck = rep.concat(rest).slice(0, QUIZ_N);
+  if (!deck.some(q => q.t === 'code')) { const c = rest.find(q => q.t === 'code' && !deck.includes(q)); if (c && deck.length) deck[deck.length - 1] = c; }
+  ui.repeat = rep.map(qKey);
+  return shuffle(deck);
+}
+function startDeck(){ ui.deckKa = ui.ka; const pool = poolOf(ui.ka); ui.deck = buildDeck(ui.qTopic === 'all' ? pool : pool.filter(q => q.topic === ui.qTopic)); ui.idx = 0; ui.codeRes = null; ui.codeTry = null; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null; ui.session = { n:0, sum:0 }; ui.summaryDone = false; }
 /* Quiz-Runde merken, damit sie beim Wechseln oder Neuladen nicht verloren geht */
 const QUIZ_N = 5, quizMem = {};
 function quizKeep(){
   if (!ui.deckKa || !ui.deck.length) return;
-  const s = { qTopic:ui.qTopic, deck:ui.deck, idx:ui.idx, front:ui.front || 0, qlog:ui.qlog || [], draft:ui.draft || null, session:ui.session, summaryDone:!!ui.summaryDone, cur:qSnap() };
+  const s = { repeat:ui.repeat || [], qTopic:ui.qTopic, deck:ui.deck, idx:ui.idx, front:ui.front || 0, qlog:ui.qlog || [], draft:ui.draft || null, session:ui.session, summaryDone:!!ui.summaryDone, cur:qSnap() };
   quizMem[ui.deckKa] = s;
   try { local.set('quiz-' + ui.deckKa, JSON.parse(JSON.stringify(s))); } catch(e) {}
 }
 function quizRestore(){
   const s = quizMem[ui.ka] || local.get('quiz-' + ui.ka);
   if (!s || !Array.isArray(s.deck) || !s.deck.length || !(s.idx < s.deck.length)) return false;
-  ui.deckKa = ui.ka; ui.qTopic = s.qTopic || 'all'; ui.deck = s.deck; ui.idx = s.idx;
+  ui.deckKa = ui.ka; ui.qTopic = s.qTopic || 'all'; ui.deck = s.deck; ui.idx = s.idx; ui.repeat = s.repeat || [];
   ui.session = s.session || { n:0, sum:0 }; ui.summaryDone = !!s.summaryDone;
   ui.qlog = Array.isArray(s.qlog) ? s.qlog : []; ui.front = Math.max(s.front || 0, s.idx); ui.draft = s.draft || null; ui.qlogDeck = ui.deck;
   const c = s.cur || {};
-  ui.answered = !!c.answered; ui.sel = c.sel != null ? c.sel : null; ui.resp = Object.assign({}, c.resp || {}); ui.freeRes = c.freeRes || null; ui.lastScore = c.lastScore || 0; ui.anim = false;
+  ui.answered = !!c.answered; ui.sel = c.sel != null ? c.sel : null; ui.resp = Object.assign({}, c.resp || {}); ui.freeRes = c.freeRes || null; ui.lastScore = c.lastScore || 0; ui.anim = false; ui.codeRes = c.codeRes || null; ui.codeTry = null;
   return true;
 }
 function quizFor(topic){
@@ -3699,8 +4014,8 @@ function summaryCard(){
     <p>${q >= .85 ? 'Diese Runde hast du richtig gut gemacht.' : q >= .6 ? 'Noch eine Runde, dann sitzt es.' : 'Lies die Lernseite noch einmal und versuch es dann wieder.'}</p>
     <div class="row-actions"><button class="btn" data-restart>Noch eine Runde</button><button class="btn ghost" data-gen ${ui.genBusy ? 'disabled' : ''}>${I.spark}${ui.genBusy ? 'Claude schreibt …' : '5 neue Fragen'}</button><button class="btn ghost" data-view-go="home">Zur Übersicht</button></div></div>`;
 }
-function metaLine(q, i, n){ const t = topicOf(ui.ka, q.topic); return `<div class="qmeta"><span class="qtopic">${esc(t ? t.title : '')}</span>${q.local ? '<span class="newtag">Zufallsaufgabe</span>' : q.gen && window.claude && window.claude.use ? '<span class="newtag">von Claude</span>' : ''}${ui.view === 'quiz' && i < (ui.front || 0) ? '<span class="newtag rev-tag">Rückblick</span>' : ''}<span class="qcount">${i + 1} / ${n}</span></div>`; }
-function questionCard(q){ const n = ui.deck.length; return q.t === 'mc' ? mcCard(q, n) : q.t === 'free' ? freeCard(q, n) : calcCard(q, n); }
+function metaLine(q, i, n){ const t = topicOf(ui.ka, q.topic); return `<div class="qmeta"><span class="qtopic">${esc(t ? t.title : '')}</span>${q.local ? '<span class="newtag">Zufallsaufgabe</span>' : q.gen && window.claude && window.claude.use ? '<span class="newtag">von Claude</span>' : ''}${ui.view === 'quiz' && i < (ui.front || 0) ? '<span class="newtag rev-tag">Rückblick</span>' : ''}${ui.view === 'quiz' && (ui.repeat || []).includes(qKey(q)) ? '<span class="newtag rep-tag">Wiederholung</span>' : ''}<span class="qcount">${i + 1} / ${n}</span></div>`; }
+function questionCard(q){ const n = ui.deck.length; return q.t === 'mc' ? mcCard(q, n) : q.t === 'free' ? freeCard(q, n) : q.t === 'code' ? codeCard(q, n) : calcCard(q, n); }
 
 function codeBlock(q){ return q && q.code ? `<pre class="code">${esc(q.code)}</pre>` : ''; }
 function mcBody(q, sel, answered){
@@ -3880,7 +4195,7 @@ function errText(e){
 }
 
 /* ---------- Prüfung ---------- */
-function examPool(kid){ return poolOf(kid).filter(q => q.t !== 'free' || ui.sample); }
+function examPool(kid){ return poolOf(kid).filter(q => q.t !== 'code' && (q.t !== 'free' || ui.sample)); }
 function pickExam(kid, n){
   const groups = {};
   for (const q of shuffle(examPool(kid))) (groups[q.topic] = groups[q.topic] || []).push(q);
@@ -3895,9 +4210,10 @@ function renderExam(){
   if (ex.phase === 'start') {
     const avail = examPool(kid).length, hist = (P[kid].exams || []).slice().reverse();
     $main.innerHTML = `<div class="lt"><h1>Probeprüfung</h1></div>
-      <p class="sub">Ohne Zeitlimit. Ergebnisse siehst du erst am Ende, benotet nach IHK-Schlüssel.</p>
+      <p class="sub">Mit oder ohne Zeitlimit. Ergebnisse siehst du erst am Ende, benotet nach IHK-Schlüssel.</p>
       <div class="glass pad"><div class="form">
         <label>Anzahl Aufgaben<select id="ex-n">${[10, 15, 20, 30].map(x => `<option ${x === ex.n ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
+        <label>Zeitlimit<select id="ex-t">${[[0, 'Ohne Zeitlimit'], [20, '20 Minuten'], [30, '30 Minuten'], [45, '45 Minuten'], [60, '60 Minuten'], [90, '90 Minuten']].map(x => `<option value="${x[0]}" ${x[0] === (ex.tl || 0) ? 'selected' : ''}>${x[1]}</option>`).join('')}</select></label>
         <p class="hint" style="margin:0">${avail} Aufgaben verfügbar${avail < ex.n ? ', also werden alle genommen' : ''}. Multiple Choice 1 Punkt, Rechnen und freie Antworten 2 Punkte.</p>
         <button class="btn big" data-exstart ${avail ? '' : 'disabled'}>${I.cap} Prüfung starten</button>
       </div></div>
@@ -3914,7 +4230,8 @@ function renderExam(){
     else if (q.t === 'free') body = `<p class="qkind">Freie Antwort</p><p class="qtext">${esc(q.q)}</p>${codeBlock(q)}<textarea class="free" data-ex="text" aria-label="Deine Antwort" placeholder="Schreib deine Antwort in ganzen Sätzen.">${esc(a.text || '')}</textarea>`;
     else body = calcHead(q) + finalFields(getSol(q), a.resp || {}, false).replace(/data-f=/g, 'data-ex=');
     const last = ex.i === ex.qs.length - 1;
-    $main.innerHTML = `<div class="lt lt-row"><h1>Probeprüfung</h1><div class="stats"><button class="linklike red" data-exabort>Abbrechen</button></div></div>
+    const left = examLeft();
+    $main.innerHTML = `<div class="lt lt-row"><h1>Probeprüfung</h1><div class="stats">${left != null ? `<span class="pill extimer${left <= 300000 ? ' warn' : ''}" id="extimer" role="timer" aria-label="Verbleibende Zeit">⏱ ${examClock(left)}</span>` : ''}<button class="linklike red" data-exabort>Abbrechen</button></div></div>
       <div class="exam-dots">${dots}</div>
       <div class="glass qcard"><div class="qmeta"><span class="qtopic">${esc((topicOf(kid, q.topic) || {}).title || '')}</span><span class="newtag">${PTS(q)} ${PTS(q) === 1 ? 'Punkt' : 'Punkte'}</span><span class="qcount">${ex.i + 1} / ${ex.qs.length}</span></div>${body}</div>
       <div class="glass action-bar"><div class="two"><button class="btn ghost" data-exprev ${ex.i ? '' : 'disabled'}>Zurück</button>${last ? `<button class="btn" data-exsubmit>Abgeben</button>` : `<button class="btn" data-exnext>Weiter</button>`}</div></div>`;
@@ -3991,6 +4308,7 @@ $main.addEventListener('change', e => {
   else if (t.matches('[data-ff="fachId"]')) { ui.form.fachId = t.value; render(); }
   else if (t.matches('[data-files]')) { ui.form.files = ui.form.files.concat(Array.from(t.files || [])); render(); }
   else if (t.id === 'ex-n') ui.exam.n = +t.value;
+  else if (t.id === 'ex-t') ui.exam.tl = +t.value;
   else if (t.id === 'adm-class') { adm.cid = t.value; adm.info = null; adm.members = null; render(); }
   else if (t.matches('[data-restore]')) { const file = t.files && t.files[0]; t.value = ''; if (file) loadBackup(file); }
 });
@@ -4003,6 +4321,8 @@ $main.addEventListener('input', e => {
 });
 $main.addEventListener('toggle', e => { if (e.target.matches('details.settings')) ui.editOpen = e.target.open; }, true);
 $main.addEventListener('keydown', e => {
+  if (e.key === 'Tab' && e.target.matches('textarea.codein') && !e.target.readOnly) { e.preventDefault(); const t = e.target, a = t.selectionStart, b = t.selectionEnd; t.value = t.value.slice(0, a) + '    ' + t.value.slice(b); t.selectionStart = t.selectionEnd = a + 4; ui.resp.code = t.value; return; }
+  if (e.key === 'Enter' && !e.shiftKey && e.target.id === 'chatin') { e.preventDefault(); chatSend(); return; }
   if (e.key === 'Enter' && e.target.matches('input[data-f]')) { e.preventDefault(); const b = $main.querySelector('[data-checkcalc],[data-nextq]'); if (b) b.click(); }
   if (e.key === 'Enter' && e.target.id === 'newfach') { e.preventDefault(); $main.querySelector('[data-addfach]').click(); }
 });
@@ -4034,6 +4354,11 @@ $main.addEventListener('click', async e => {
   else if ('fblogout' in d) fbLogout();
   else if ('backup' in d) saveBackup();
   else if ('tour' in d) openTour(0);
+  else if ('coderun' in d) codeTry();
+  else if ('codecheck' in d) codeCheck();
+  else if ('codeai' in d) codeAi();
+  else if ('chatsend' in d) chatSend();
+  else if (d.chatdel) chatDel(d.chatdel);
   else if ('classpick' in d) showClassPicker();
   else if ('adpublish' in d) adminPublish();
   else if ('admrename' in d) admAction('rename');
@@ -4090,7 +4415,7 @@ $main.addEventListener('click', async e => {
   else if (d.qt) { if (d.qt === ui.qTopic) return; const prevRow = $main.querySelector('.chips'), sl = prevRow ? prevRow.scrollLeft : 0; ui.qTopic = d.qt; ui.genMsg = ''; startDeck(); render(); const row = $main.querySelector('.chips'); if (row) { row.scrollLeft = sl; centerChip(row); } animateIn($main.querySelector('.qcard,.summary'), 'enter-swap'); navPush(); }
   else if (d.mode) { if (M.mode === d.mode) return; const cur = ui.deck[ui.idx]; if (ui.answered && cur && cur.t === 'calc') { ui.idx++; ui.answered = false; ui.sel = null; } if (!ui.answered) ui.resp = {}; M.mode = d.mode; persist('meta', M); render(); }
   else if (d.opt != null) { ui.sel = +d.opt; render(); }
-  else if ('checkmc' in d) { const q = ui.deck[ui.idx]; ui.answered = true; const s = ui.sel === q.a ? 1 : 0; ui.session.n++; ui.session.sum += s; record(q.topic, s); classAnswer(q, q.topic, s); afterCheck(s); qSave(); render(); }
+  else if ('checkmc' in d) { const q = ui.deck[ui.idx]; ui.answered = true; const s = ui.sel === q.a ? 1 : 0; ui.session.n++; ui.session.sum += s; markResult(q, s); record(q.topic, s); classAnswer(q, q.topic, s); afterCheck(s); qSave(); render(); }
   else if ('checkfree' in d) {
     const q = ui.deck[ui.idx], text = String(ui.resp.text || '').trim();
     if (!text) { const ta = $main.querySelector('textarea.free'); if (ta) ta.focus(); return; }
@@ -4100,7 +4425,7 @@ $main.addEventListener('click', async e => {
     catch(err) { toast(errText(err) || 'Die Bewertung hat nicht geklappt.'); }
     ui.grading = false; render();
   }
-  else if (d.self != null) { const q = ui.deck[ui.idx], s = +d.self; ui.freeRes = { score:s, feedback:'' }; ui.session.n++; ui.session.sum += s; record(q.topic, s); afterCheck(s); qSave(); render(); }
+  else if (d.self != null) { const q = ui.deck[ui.idx], s = +d.self; ui.freeRes = { score:s, feedback:'' }; ui.session.n++; ui.session.sum += s; markResult(q, s); record(q.topic, s); afterCheck(s); qSave(); render(); }
   else if ('checkcalc' in d) {
     const q = ui.deck[ui.idx], sol = getSol(q), resp = ui.resp;
     let fields;
@@ -4108,21 +4433,21 @@ $main.addEventListener('click', async e => {
     else fields = sol.answers.map(a => [resp[a.key], a.value, a.unit === '%' ? .05 : .02]);
     if (fields.every(f => !String(f[0] || '').trim())) { const inp = $main.querySelector('.qcard input'); if (inp) inp.focus(); return; }
     const score = fields.filter(f => ok(f[0], f[1], f[2])).length / fields.length;
-    ui.lastScore = score; ui.answered = true; ui.session.n++; ui.session.sum += score; record(q.topic, score); classAnswer(q, q.topic, score); afterCheck(score); qSave(); render();
+    ui.lastScore = score; ui.answered = true; ui.session.n++; ui.session.sum += score; markResult(q, score); record(q.topic, score); classAnswer(q, q.topic, score); afterCheck(score); qSave(); render();
   }
   else if ('hint' in d) showHint();
   else if ('qback' in d) qGo(-1);
   else if ('qfwd' in d) qGo(1);
   else if ('nextq' in d) {
     if (ui.idx < (ui.front || 0)) { qGo(1); return; }
-    ui.idx++; ui.front = Math.max(ui.front || 0, ui.idx); ui.draft = null; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null; render();
+    ui.idx++; ui.front = Math.max(ui.front || 0, ui.idx); ui.draft = null; ui.answered = false; ui.sel = null; ui.resp = {}; ui.freeRes = null; ui.codeRes = null; ui.codeTry = null; render();
     animateIn($main.querySelector('.summary'), 'enter-fade');
     const c = $main.querySelector('.qcard'); if (c) { animateIn(c, 'enter-card'); c.scrollIntoView({ block:'start', behavior:'smooth' }); const i = c.querySelector('input[data-f],textarea'); if (i && window.matchMedia('(pointer:fine)').matches) i.focus({ preventScroll:true }); }
   }
   else if ('restart' in d) { startDeck(); render(); }
   else if (d.viewGo) go(d.viewGo);
   else if ('gen' in d) genQuestions();
-  else if ('exstart' in d) { const ex = ui.exam; ex.qs = pickExam(kid, ex.n); ex.ans = {}; ex.i = 0; ex.phase = 'run'; render(); }
+  else if ('exstart' in d) { const ex = ui.exam; ex.qs = pickExam(kid, ex.n); ex.ans = {}; ex.i = 0; ex.phase = 'run'; ex.deadline = ex.tl ? Date.now() + ex.tl * 60000 : 0; render(); }
   else if (d.exopt != null) { const ex = ui.exam; ex.ans[ex.i] = Object.assign(ex.ans[ex.i] || {}, { sel:+d.exopt }); render(); }
   else if (d.exjump != null) { examStore(); ui.exam.i = +d.exjump; render(); }
   else if ('exprev' in d) { examStore(); ui.exam.i--; render(); animateIn($main.querySelector('.qcard'), 'enter-card-back'); }
