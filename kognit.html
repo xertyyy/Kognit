@@ -1967,7 +1967,15 @@ function renderLogin(){
 
 /* ===================== Code-Aufgaben: Python läuft im Browser (Pyodide) ===================== */
 const PY_URL = 'https://cdn.jsdelivr.net/pyodide/v0.27.7/full/';
-const AI_URL = '';   // Adresse des Cloudflare-Workers für KI-Feedback (leer = aus)
+const AI_URL = 'https://kognit-ki.vincentbrisse.workers.dev/';   // Adresse des Cloudflare-Workers für KI-Feedback (leer = aus)
+const kiOn = () => !!(AI_URL && fb.user);
+async function ki(mode, data){
+  const token = await fb.user.getIdToken();
+  const resp = await fetch(AI_URL, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token }, body:JSON.stringify(Object.assign({ mode }, data)) });
+  const d = await resp.json().catch(() => ({}));
+  if (!resp.ok || d.error) throw new Error(d.error || 'Die KI hat gerade keine Zeit. Versuch es sp\u00e4ter noch einmal.');
+  return d;
+}
 /* Aufgaben je Thema (Zuordnung über den Thementitel). Prüfung: Programm läuft mit den Eingaben,
    die Ausgabe muss die erwarteten Werte enthalten (has), darf bestimmte nicht enthalten (not)
    oder muss genau diese Zeilen haben (lines). use = Pflicht-Baustein im Code. */
@@ -2147,7 +2155,7 @@ async function codeAi(){
   try {
     const token = await fb.user.getIdToken();
     const resp = await fetch(AI_URL, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
-      body:JSON.stringify({ task:q.q, code:String(ui.resp.code || '').slice(0, 4000), tests:r.results.map(t => ({ ok:t.ok, why:t.why || '' })) }) });
+      body:JSON.stringify({ mode:'code', task:q.q, code:String(ui.resp.code || '').slice(0, 4000), tests:r.results.map(t => ({ ok:t.ok, why:t.why || '' })) }) });
     const d = await resp.json().catch(() => ({}));
     if (!resp.ok || !d.text) throw new Error(d.error || 'Die KI hat gerade keine Zeit. Versuch es sp\u00e4ter noch einmal.');
     r.ai = String(d.text).slice(0, 1500); qSave();
@@ -3202,7 +3210,8 @@ function showPrepared(t){
 }
 async function explainOther(){
   const t = topicOf(ui.ka, ui.kb); if (!t || ui.altBusy) return;
-  if (!ui.sample || (ui.alt && ui.alt.id === t.id && ui.alt.pre != null)) { if (showPrepared(t) || !ui.sample) return; }
+  const live = !!ui.sample || kiOn();
+  if (!live || (ui.alt && ui.alt.id === t.id && ui.alt.pre != null)) { if (showPrepared(t) || !live) return; }
   const prev = ui.alt && ui.alt.id === t.id ? plain(ui.alt.html).slice(0, 1500) : '';
   ui.altBusy = true; ui.alt = { id:t.id, html:'' }; paintAlt();
   const prompt = `Erkläre dieses Thema für eine Person an einer kaufmännischen Berufsschule noch einmal ganz anders. Sie hat die Lernseite gelesen und es noch nicht ganz verstanden.
@@ -3213,12 +3222,36 @@ Regeln: ein neues, anschauliches Alltagsbeispiel, das nicht auf der Lernseite st
 Erlaubte HTML-Tags: <p>, <b>, <ul>, <li>, <pre>, <code>. Letzter Absatz beginnt mit <b>Merke:</b>.
 Antworte nur mit JSON: {"html":"..."}`;
   try {
-    const out = await ui.sample.json(prompt, { modelTier:'default', cache:false });
+    const out = ui.sample ? await ui.sample.json(prompt, { modelTier:'default', cache:false }) : { html:(await ki('explain', { title:t.title, page:plain(t.html || t.facts || '').slice(0, 6000), prev })).text };
     const html = sanitize(out && out.html || '');
     if (!html || html.length < 40) throw new Error('leer');
     ui.alt = { id:t.id, html };
   } catch(e) { ui.alt = null; if (!altList(t).length) toast(errText(e) || 'Das hat nicht geklappt. Versuch es noch einmal.'); }
   ui.altBusy = false; if (!ui.alt && altList(t).length) showPrepared(t); else paintAlt();
+}
+
+/* ---------- Lern-Chat zum Thema ---------- */
+function tchatInner(t){
+  const c = ui.tchat && ui.tchat.id === t.id ? ui.tchat : { msgs:[] };
+  const msgs = c.msgs.map(m => `<p style="white-space:pre-wrap;margin:8px 0"><b>${m.r === 'u' ? 'Du' : 'KI'}:</b> ${esc(m.t)}</p>`).join('');
+  return `<details class="tchat" ${c.msgs.length ? 'open' : ''}><summary>${I.spark} Frag die KI zu diesem Thema</summary>
+    ${msgs || '<p class="hint">Stell eine Frage zum Thema. Die KI antwortet auf Grundlage dieser Lernseite. Prüf Wichtiges trotzdem im Unterricht nach.</p>'}${c.busy ? '<p class="hint">KI denkt nach …</p>' : ''}
+    <div class="row-actions"><input type="text" id="tcin" maxlength="500" style="flex:1;min-width:0" placeholder="Deine Frage …" aria-label="Frage an die KI" value="${esc(c.draft || '')}" ${c.busy ? 'disabled' : ''}><button class="btn small" data-tcsend ${c.busy ? 'disabled' : ''}>Fragen</button></div></details>`;
+}
+function paintTchat(){
+  const art = $main.querySelector('article.kb'), t = topicOf(ui.ka, ui.kb); if (!art || !t) return;
+  const slot = art.querySelector('.tchat-slot'); if (slot) slot.innerHTML = tchatInner(t);
+}
+async function tchatSend(){
+  const t = topicOf(ui.ka, ui.kb), inp = $main.querySelector('#tcin'); if (!t || !inp || !kiOn()) return;
+  const q = inp.value.trim(); if (!q) { inp.focus(); return; }
+  if (!ui.tchat || ui.tchat.id !== t.id) ui.tchat = { id:t.id, msgs:[] };
+  const c = ui.tchat; if (c.busy) return;
+  const history = c.msgs.slice(-6);
+  c.msgs.push({ r:'u', t:q }); c.draft = ''; c.busy = true; paintTchat();
+  try { const d = await ki('chat', { title:t.title, page:plain(t.html || t.facts || '').slice(0, 6000), history, question:q }); c.msgs.push({ r:'a', t:String(d.text || '').slice(0, 2000) }); }
+  catch(e) { c.msgs.pop(); c.draft = q; toast(e.message || 'Das hat nicht geklappt.'); }
+  c.busy = false; if (c.msgs.length > 20) c.msgs = c.msgs.slice(-20); paintTchat();
 }
 
 /* ---------- F9 Statistik und D8 Lernkalender ---------- */
@@ -3591,7 +3624,7 @@ function renderHelp(){
       <h3>Was die App kann</h3>
       <ul>
         <li><b>Wissen:</b> Lernseiten zu jedem Thema. Mit „Erklär’s mir anders“ bekommst du bis zu fünf andere Erklärungen. Mit „Nächste“ blätterst du weiter.</li>
-        <li><b>Quiz:</b> Übungsfragen mit Tipps. Bei freien Fragen vergleichst du deine Antwort mit der Musterlösung und bewertest dich selbst.</li>
+        <li><b>Quiz:</b> Übungsfragen mit Tipps. Bei freien Fragen bewertet die KI deine Antwort, wenn du angemeldet bist. Sonst vergleichst du sie mit der Musterlösung und bewertest dich selbst.</li>
         <li><b>Prüfung:</b> eine Probeklausur mit Note.</li>
         <li><b>Fokus-Timer:</b> lernen in Etappen mit Pausen.</li>
       </ul>
@@ -3924,7 +3957,7 @@ function kbArticle(t){
   else body = `<div class="tip">Für dieses Thema fehlt noch die Lernseite.</div><p style="white-space:pre-wrap">${esc(t.facts || '')}</p>
     ${ui.sample ? `<button class="btn small" data-filltopic="${t.id}" ${ui.genBusy ? 'disabled' : ''}>${ui.genBusy ? 'Claude schreibt …' : 'Lernseite erzeugen'}</button>` : ''}`;
   return `<article class="glass kb"><div class="kb-head">${ticon(t, true)}<h2 class="kb-title">${esc(t.title)}</h2></div>
-    ${ui.sample || altList(t).length ? `<button class="btn small ghost alt-btn" data-altexplain ${ui.altBusy ? 'disabled' : ''}>${I.spark} Erklär’s mir anders</button>` : ''}<div class="alt-slot">${altInner(t)}</div>${body}
+    ${ui.sample || kiOn() || altList(t).length ? `<button class="btn small ghost alt-btn" data-altexplain ${ui.altBusy ? 'disabled' : ''}>${I.spark} Erklär’s mir anders</button>` : ''}<div class="alt-slot">${altInner(t)}</div>${body}${kiOn() ? `<div class="tchat-slot">${tchatInner(t)}</div>` : ''}
       <div class="kb-actions">
         <button class="btn ${done ? 'tinted' : ''}" data-toggle="${t.id}">${done ? I.check + ' Gelesen' : 'Als gelesen abhaken'}</button>
         <button class="btn ghost" data-practice="${t.id}">${I.bolt} Üben</button>
@@ -4037,7 +4070,7 @@ function mcCard(q, n){
 function freeCard(q, n){
   const r = ui.freeRes;
   let bar, inCard = '';
-  if (ui.grading) bar = `<button class="btn big" disabled>Claude bewertet …</button>`;
+  if (ui.grading) bar = `<button class="btn big" disabled>${ui.sample ? 'Claude' : 'Die KI'} bewertet …</button>`;
   else if (ui.answered && r) {
     const good = r.score >= .75;
     bar = `<div class="verdict ${good ? 'good' : 'bad'}"><b>${r.score >= .999 ? '✓ Volle Punktzahl!' : r.score > 0 ? Math.round(r.score * 100) + ' % der Punkte' : '✕ Noch nicht richtig.'}</b>${r.feedback ? `<p>${esc(r.feedback)}</p>` : ''}</div><button class="btn big" data-nextq>Weiter</button>`;
@@ -4045,7 +4078,7 @@ function freeCard(q, n){
   } else if (ui.answered && !r) {
     inCard = `<div class="feedback"><b>Musterlösung</b>${esc(q.m)}</div>`;
     bar = `<div class="verdict neutral"><b>Wie gut war deine Antwort?</b></div><div class="three"><button class="btn small" data-self="1">Richtig</button><button class="btn small ghost" data-self=".5">Teilweise</button><button class="btn small ghost" data-self="0">Falsch</button></div>`;
-  } else bar = `<button class="btn big" data-checkfree>${ui.sample ? 'Von Claude bewerten lassen' : 'Musterlösung zeigen'}</button>`;
+  } else bar = `<button class="btn big" data-checkfree>${ui.sample ? 'Von Claude bewerten lassen' : kiOn() ? 'Von der KI bewerten lassen' : 'Musterlösung zeigen'}</button>`;
   const selfMode = ui.answered && !r && !ui.grading;
   return `<div class="glass qcard">${metaLine(q, ui.idx, n)}<p class="qkind">Freie Antwort</p><p class="qtext">${esc(q.q)}</p>${codeBlock(q)}${hintUI()}
     <textarea class="free" data-f="text" ${ui.answered || ui.grading ? 'readonly' : ''} aria-label="Deine Antwort" placeholder="Schreib deine Antwort in ganzen Sätzen.">${esc(ui.resp.text || '')}</textarea>${inCard}</div>
@@ -4104,6 +4137,11 @@ function solutionTable(sol, kind, open){
 }
 
 async function gradeFree(q, answer){
+  if (!ui.sample) {
+    const d = await ki('grade', { question:q.q, model:q.m, answer:String(answer).slice(0, 3000) });
+    const s = Math.max(0, Math.min(1, Number(d.score)));
+    return { score: isFinite(s) ? Math.round(s * 4) / 4 : 0, feedback: String(d.feedback || '').slice(0, 600) };
+  }
   const r = await ui.sample.json(`Du bewertest eine Übungsantwort für eine Klassenarbeit an einer kaufmännischen Berufsschule. Sei fair und genau. Rechtschreibung zählt nicht.
 Frage: ${q.q}
 Musterlösung: ${q.m}
@@ -4323,6 +4361,7 @@ $main.addEventListener('toggle', e => { if (e.target.matches('details.settings')
 $main.addEventListener('keydown', e => {
   if (e.key === 'Tab' && e.target.matches('textarea.codein') && !e.target.readOnly) { e.preventDefault(); const t = e.target, a = t.selectionStart, b = t.selectionEnd; t.value = t.value.slice(0, a) + '    ' + t.value.slice(b); t.selectionStart = t.selectionEnd = a + 4; ui.resp.code = t.value; return; }
   if (e.key === 'Enter' && !e.shiftKey && e.target.id === 'chatin') { e.preventDefault(); chatSend(); return; }
+  if (e.key === 'Enter' && e.target.id === 'tcin') { e.preventDefault(); tchatSend(); return; }
   if (e.key === 'Enter' && e.target.matches('input[data-f]')) { e.preventDefault(); const b = $main.querySelector('[data-checkcalc],[data-nextq]'); if (b) b.click(); }
   if (e.key === 'Enter' && e.target.id === 'newfach') { e.preventDefault(); $main.querySelector('[data-addfach]').click(); }
 });
@@ -4386,6 +4425,7 @@ $main.addEventListener('click', async e => {
   else if (d.kb) { if (d.kb !== ui.kb) { ui.alt = null; switchKb(d.kb); } }
   else if (d.goto) { const h = document.getElementById(d.goto); if (h) h.scrollIntoView({ behavior:RM() ? 'auto' : 'smooth', block:'start' }); t.blur(); }
   else if ('altexplain' in d) explainOther();
+  else if ('tcsend' in d) tchatSend();
   else if ('altclose' in d) { ui.alt = null; paintAlt(); }
   else if (d.toggle) {
     const p = P[kid], id = d.toggle; p.done[id] = !p.done[id]; if (p.done[id]) bumpDay(p); persist('prog-' + kid, p); haptic(true);
@@ -4419,10 +4459,10 @@ $main.addEventListener('click', async e => {
   else if ('checkfree' in d) {
     const q = ui.deck[ui.idx], text = String(ui.resp.text || '').trim();
     if (!text) { const ta = $main.querySelector('textarea.free'); if (ta) ta.focus(); return; }
-    if (!ui.sample) { ui.answered = true; ui.freeRes = null; render(); const fbk = $main.querySelector('.qcard .feedback'); if (fbk) fbk.scrollIntoView({ block:'center', behavior:RM() ? 'auto' : 'smooth' }); return; }
+    if (!ui.sample && !kiOn()) { ui.answered = true; ui.freeRes = null; render(); const fbk = $main.querySelector('.qcard .feedback'); if (fbk) fbk.scrollIntoView({ block:'center', behavior:RM() ? 'auto' : 'smooth' }); return; }
     ui.grading = true; render();
     try { const r = await gradeFree(q, text); ui.freeRes = r; ui.answered = true; ui.session.n++; ui.session.sum += r.score; record(q.topic, r.score); afterCheck(r.score); qSave(); }
-    catch(err) { toast(errText(err) || 'Die Bewertung hat nicht geklappt.'); }
+    catch(err) { toast((ui.sample ? errText(err) : err.message) || 'Die Bewertung hat nicht geklappt.'); if (!ui.sample) { ui.answered = true; ui.freeRes = null; } }
     ui.grading = false; render();
   }
   else if (d.self != null) { const q = ui.deck[ui.idx], s = +d.self; ui.freeRes = { score:s, feedback:'' }; ui.session.n++; ui.session.sum += s; markResult(q, s); record(q.topic, s); afterCheck(s); qSave(); render(); }
