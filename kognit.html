@@ -2986,7 +2986,9 @@ function poolOf(id){
   const tids = new Set(topicsOf(id).map(t => t.id));
   const unl = new Set((P[id] && P[id].bank) || []);
   const base = a.builtin ? FIXED.concat(FREE_BUILTIN, BANK.filter(q => unl.has(q.id))) : [];
-  return base.concat((C[id] && C[id].gen) || [], codeTasksFor(id)).filter(q => tids.has(q.topic));
+  /* Sicherung auch für schon gespeicherte KI-Fragen */
+  const gen = ((C[id] && C[id].gen) || []).map(q => q && q.gen && (q.t === 'free' || (q.t === 'mc' && Array.isArray(q.o))) ? safeGen(q) : q);
+  return base.concat(gen, codeTasksFor(id)).filter(q => tids.has(q.topic));
 }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const eur = v => (v < 0 ? '−' : '') + Math.abs(v).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' €';
@@ -3998,7 +4000,7 @@ function cleanTask(kind, t){
   try { const s = solve(task); if (s.answers.some(a => !isFinite(a.value))) return null; if (kind === 'rueck' && s.answers.some(a => a.value <= 0)) return null; } catch(e) { return null; }
   return task;
 }
-const nz = x => String(x || '').replace(/\s+/g, '');
+function nz(x){ return String(x || '').replace(/\s+/g, ''); }
 /* KI-Fragen absichern: kein Code, der in der Musterlösung steht, kein Tipp, der die richtige Antwort enthält */
 function safeGen(q){
   if (q.t === 'free' && q.code && nz(q.m).includes(nz(q.code))) q.code = undefined;
