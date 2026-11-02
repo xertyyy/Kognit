@@ -2570,7 +2570,8 @@ function classSectionHtml(){
   const cid = myClass();
   return `<section><h2 class="group-title">Klasse</h2>
     <div class="glass list">${cid ? '<button class="row add" data-view-go="chat"><span class="add-ic">💬</span><span class="row-title">Klassenchat</span></button>' : ''}<button class="row add" data-classpick><span class="add-ic">🎓</span><span class="row-title">${cid ? esc(className(cid)) + ' · ' + esc((M.profile && M.profile.name) || '') : 'Klasse auswählen'}</span></button></div>
-    <p class="footnote">Dein Vorname und dein Bereit-% bei der nächsten Klassenarbeit sind für deine Klasse im Leaderboard sichtbar.<br>Nutzer-ID: <code>${esc(fb.user.uid)}</code></p></section>`;
+    <p class="footnote">Dein Vorname und dein Bereit-% bei der nächsten Klassenarbeit sind für deine Klasse im Leaderboard sichtbar.<br>Nutzer-ID: <code>${esc(fb.user.uid)}</code></p>
+    <p class="footnote">Was du an die KI schickst, geht über Cloudflare an OpenRouter und den KI-Anbieter und kann dort gespeichert werden. Schick der KI keine privaten Daten.</p></section>`;
 }
 function adminSectionHtml(){
   if (!isAdmin()) return '';
