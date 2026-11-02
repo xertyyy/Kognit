@@ -1961,11 +1961,19 @@ const XR = {};   // gespeicherte Prüfungen (Fragen, Antworten, Bewertung) pro K
 function ensure(id){ if (!XR[id]) XR[id] = local.get('exr-' + id) || { list:[], updated:0 }; if (!P[id]) P[id] = local.get('prog-' + id) || blankProg(); if (!C[id]) C[id] = local.get('ka-' + id) || (id === STARTER.ka.id ? JSON.parse(JSON.stringify(STARTER.content)) : blankContent()); }
 M.arbeiten.forEach(a => ensure(a.id));
 /* Neue eingebaute Fragen des Starter-Pakets in bestehende Konten übernehmen (ohne Doppelte) */
+const starterKey = q => q.topic + '|' + q.q + '|' + (q.code || '');
+/* Tipps (h) der eingebauten Fragen auch in Kopien übernehmen, z. B. in die Klassen-Version */
+function applyStarterHints(c){
+  if (!c || !Array.isArray(c.gen)) return false;
+  const map = new Map(STARTER.content.gen.filter(q => q.h).map(q => [starterKey(q), q.h]));
+  let n = 0; c.gen.forEach(q => { const h = map.get(starterKey(q)); if (h && !q.h) { q.h = h; n++; } });
+  return n > 0;
+}
 function starterTopUp(save){
+  M.arbeiten.forEach(a => { if (a.id !== STARTER.ka.id && applyStarterHints(C[a.id])) { if (save) persist('ka-' + a.id, C[a.id]); else local.set('ka-' + a.id, C[a.id]); } });
   const c = C[STARTER.ka.id]; if (!c || !Array.isArray(c.gen)) return;
-  const k = q => q.topic + '|' + q.q + '|' + (q.code || ''), have = new Map(c.gen.map(q => [k(q), q]));
-  let changed = false;
-  STARTER.content.gen.forEach(q => { const o = have.get(k(q)); if (o && q.h && !o.h) { o.h = q.h; changed = true; } });
+  const k = starterKey, have = new Map(c.gen.map(q => [k(q), q]));
+  let changed = applyStarterHints(c);
   const add = STARTER.content.gen.filter(q => !have.has(k(q)));
   if (add.length) { c.gen = c.gen.concat(JSON.parse(JSON.stringify(add))); changed = true; }
   if (!changed) return;
@@ -2106,7 +2114,7 @@ function kiStatus(msg){
 }
 async function ki(mode, data){
   const deep = mode === 'questions' || mode === 'code';
-  const steps = [[3000, 'Die KI denkt nach …'], [10000, 'Dauert etwas länger: Das Hauptmodell ist wohl ausgelastet, ein Ersatzmodell springt ein …'], [25000, deep ? 'Gründliches Nachdenken dauert bis zu einer Minute. Gleich geschafft …' : 'Die KI ist gerade sehr langsam. Noch einen Moment …']];
+  const steps = [[3000, 'Die KI denkt nach …'], [10000, 'Dauert etwas länger: Das Hauptmodell ist wohl ausgelastet, ein Ersatzmodell springt ein …'], [25000, deep ? 'Gründliches Nachdenken kann bis zu 2 Minuten dauern. Bleib kurz dran …' : 'Die KI ist gerade sehr langsam. Noch einen Moment …'], [70000, 'Die Gratis-KI ist gerade stark ausgelastet. Gleich geschafft …']];
   const timers = steps.map(([ms, m]) => setTimeout(() => kiStatus(m), ms));
   try {
     const token = await fb.user.getIdToken();
@@ -2452,6 +2460,7 @@ async function classSync(){
           const topics = Array.isArray(data.topics) ? data.topics : [];
           topics.forEach(t => { if (typeof t.html === 'string') t.html = sanitize(t.html); if (Array.isArray(t.alts)) t.alts = t.alts.filter(v => typeof v === 'string').map(v => sanitize(v)); });
           C[kid] = Object.assign(blankContent(), { topics, gen:Array.isArray(data.gen) ? data.gen : [], info:String(data.info || ''), classVer:nx.updated || 0 });
+          applyStarterHints(C[kid]);
           persist('ka-' + kid, C[kid]);
         }
       }
@@ -3438,9 +3447,11 @@ Antworte nur mit JSON: {"html":"..."}`;
 }
 
 /* ---------- Lern-Chat zum Thema ---------- */
+/* KI-Text: `code` als Code anzeigen, sonst nur Text */
+function kiText(s){ return esc(s).replace(/`([^`\n]{1,120})`/g, '<code>$1</code>'); }
 function tchatInner(t){
   const c = ui.tchat && ui.tchat.id === t.id ? ui.tchat : { msgs:[] };
-  const msgs = c.msgs.map(m => `<p style="white-space:pre-wrap;margin:8px 0"><b>${m.r === 'u' ? 'Du' : 'KI'}:</b> ${esc(m.t)}</p>`).join('');
+  const msgs = c.msgs.map(m => `<p style="white-space:pre-wrap;margin:8px 0"><b>${m.r === 'u' ? 'Du' : 'KI'}:</b> ${m.r === 'u' ? esc(m.t) : kiText(m.t)}</p>`).join('');
   return `<details class="tchat" ${c.msgs.length ? 'open' : ''}><summary>${I.spark.replace('<svg ', '<svg style="width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;vertical-align:-4px;margin-right:4px" ')}Frag die KI zu diesem Thema</summary>
     ${msgs || '<p class="hint">Stell eine Frage zum Thema. Die KI antwortet auf Grundlage dieser Lernseite. Prüf Wichtiges trotzdem im Unterricht nach.</p>'}${c.busy ? '<p class="hint">KI denkt nach …</p>' : ''}
     <div class="row-actions"><input type="text" id="tcin" maxlength="500" style="flex:1;min-width:0" placeholder="Deine Frage …" aria-label="Frage an die KI" value="${esc(c.draft || '')}" ${c.busy ? 'disabled' : ''}><button class="btn small" data-tcsend ${c.busy ? 'disabled' : ''}>Fragen</button></div></details>`;
@@ -3987,6 +3998,13 @@ function cleanTask(kind, t){
   try { const s = solve(task); if (s.answers.some(a => !isFinite(a.value))) return null; if (kind === 'rueck' && s.answers.some(a => a.value <= 0)) return null; } catch(e) { return null; }
   return task;
 }
+const nz = x => String(x || '').replace(/\s+/g, '');
+/* KI-Fragen absichern: kein Code, der in der Musterlösung steht, kein Tipp, der die richtige Antwort enthält */
+function safeGen(q){
+  if (q.t === 'free' && q.code && nz(q.m).includes(nz(q.code))) q.code = undefined;
+  if (q.t === 'mc' && q.h) { const ok = String(q.o[q.a] || '').trim(); if (ok.length >= 2 && q.h.includes(ok)) q.h = undefined; }
+  return q;
+}
 function cleanQuestions(arr, topic){
   const out = [];
   if (!Array.isArray(arr)) return out;
@@ -4001,14 +4019,18 @@ function cleanQuestions(arr, topic){
       if (task) out.push({ t:'calc', topic:topic.id, title:String(it.title || 'Rechenaufgabe').slice(0, 80), scenario:String(it.scenario || '').slice(0, 300), task, gen:true });
     }
   }
-  return out;
+  return out.map(safeGen);
 }
 function capContent(c){ let s = JSON.stringify(c).length; while (s > 230000 && c.gen.length) { c.gen.shift(); s = JSON.stringify(c).length; } }
 
 const CALC_SPEC = kind => `Rechenaufgabe: {"t":"calc","title":"kurzer Titel mit Produkt","scenario":"1 Satz Situation, OHNE Zahlen","task":{"kind":"${kind}","p":{...}}}. Erlaubte Felder in p: ${FIELDS[kind]}. Prozentwerte als Zahl (10 für 10 %). Realistische, unterschiedliche Werte. Die App rechnet die Lösung selbst aus.`;
 const FORMAT_SPEC = `Multiple Choice: {"t":"mc","q":"Frage","o":["A","B","C","D"],"a":Index der einzigen richtigen Antwort (0 bis 3),"e":"1 bis 2 Sätze Erklärung","h":"kurzer Tipp, der zum Denkweg führt, aber die Antwort nicht verrät"}
 Freie Frage: {"t":"free","q":"Frage, die man in 2 bis 5 Sätzen beantwortet","m":"Musterlösung mit allen Punkten, die in der Antwort vorkommen sollen","h":"kurzer Tipp, der die Antwort nicht verrät"}
-Bei Programmier-Themen: Programmcode NIE in "q" schreiben, sondern ins optionale Feld "code" (mit \n für Zeilenumbrüche und 4 Leerzeichen Einrückung). Sind die Antwortmöglichkeiten selbst Code oder Programmausgaben, setze zusätzlich "mono":true. Prüfe jede Programmausgabe Zeichen für Zeichen.`;
+Bei Programmier-Themen: Programmcode NIE in "q" schreiben, sondern ins optionale Feld "code" (mit \n für Zeilenumbrüche und 4 Leerzeichen Einrückung). Sind die Antwortmöglichkeiten selbst Code oder Programmausgaben, setze zusätzlich "mono":true. Prüfe jede Programmausgabe Zeichen für Zeichen.
+Soll die Person selbst Code schreiben, lass "code" weg: Die Lösung steht NUR in "m", nie in "code" oder "q".
+Jede falsche Antwortmöglichkeit muss nach dem Lernstoff eindeutig falsch sein, nicht nur unüblich oder schlechter Stil. Es darf keine zweite Antwort geben, die man auch als richtig verteidigen kann.
+Der Tipp "h" darf die richtige Antwort weder nennen noch zeigen noch umschreiben.
+Alles auf Deutsch, auch in Antwortmöglichkeiten (z. B. „Fehler“ statt „Error“).`;
 
 async function fillTopic(kid, t, text){
   const prompt = `Du bereitest eine Person an einer kaufmännischen Berufsschule in Deutschland auf eine Klassenarbeit vor. Sie fängt fast bei null an.
@@ -4287,7 +4309,7 @@ function freeCard(q, n){
   if (ui.grading) bar = `<button class="btn big" disabled>${ui.sample ? 'Claude' : 'Die KI'} bewertet …</button>`;
   else if (ui.answered && r) {
     const good = r.score >= .75;
-    bar = `<div class="verdict ${good ? 'good' : 'bad'}"><b>${r.score >= .999 ? '✓ Volle Punktzahl!' : r.score > 0 ? Math.round(r.score * 100) + ' % der Punkte' : '✕ Noch nicht richtig.'}</b>${r.feedback ? `<p>${esc(r.feedback)}</p>` : ''}</div><button class="btn big" data-nextq>Weiter</button>`;
+    bar = `<div class="verdict ${good ? 'good' : 'bad'}"><b>${r.score >= .999 ? '✓ Volle Punktzahl!' : r.score > 0 ? Math.round(r.score * 100) + ' % der Punkte' : '✕ Noch nicht richtig.'}</b>${r.feedback ? `<p>${kiText(r.feedback)}</p>` : ''}</div><button class="btn big" data-nextq>Weiter</button>`;
     inCard = `<details><summary>Musterlösung</summary><p style="margin-top:8px">${esc(q.m)}</p></details>`;
   } else if (ui.answered && !r) {
     inCard = `<div class="feedback"><b>Musterlösung</b>${esc(q.m)}</div>`;
