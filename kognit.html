@@ -1084,6 +1084,13 @@ main .btn,main .chip,main .navbtn,main .themebtn{-webkit-backdrop-filter:saturat
 #kistat.on{opacity:1;transform:translate(-50%,0)}
 #kistat::before{content:"";position:absolute;left:14px;top:50%;width:13px;height:13px;margin-top:-7px;border-radius:50%;border:2px solid var(--fill2);border-top-color:rgb(var(--acc-rgb));animation:kispin .8s linear infinite}
 @keyframes kispin{to{transform:rotate(360deg)}}
+/* ---------- Leaderboard: Trend, Themen, zuletzt aktiv ---------- */
+.board li{grid-template-columns:30px minmax(0,1fr) minmax(44px,110px) 52px}
+.board .bd-meta{display:block;margin-top:1px;font-size:12px;font-weight:500;color:var(--label2);overflow:hidden;text-overflow:ellipsis}
+.board .bd-val{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+.board .bd-trend{font-size:11px;font-weight:600;font-variant-numeric:tabular-nums}
+.board .bd-trend.up{color:var(--green)}
+.board .bd-trend.down{color:var(--red)}
 </style>
 </head>
 <body>
@@ -2444,8 +2451,8 @@ async function classSync(){
     await ensureScore();
   } catch(e) { console.warn('Klasse konnte nicht geladen werden', e); }
 }
-/* Jede Quiz-Antwort wird einzeln mit Server-Zeitstempel protokolliert (höchstens eine alle 3 Sekunden).
-   Die Firestore-Regeln lassen die Punkteliste nur wachsen, wenn im selben Schritt genau diese Antwort gespeichert wird. */
+/* Leaderboard = genau dein Bereit-% aus der Übersicht: Die App spiegelt die letzten 10 Antworten pro Thema (P.hist)
+   nach scores/{uid}.h (höchstens alle 3 Sekunden). prev = Bereit-% vor der ersten Änderung des Tages (für ↑↓). */
 function scoreRef(cid){ return fb.fs.doc('classes/' + cid + '/scores/' + fb.user.uid); }
 async function ensureScore(){
   const cid = myClass(), nx = cls.info && cls.info.next;
@@ -2455,47 +2462,48 @@ async function ensureScore(){
     const d = await scoreRef(cid).get();
     if (!d.exists) {
       await scoreRef(cid).set({ name, kaId:nx.id, h:{}, lastAt:firebase.firestore.FieldValue.serverTimestamp(), lastId:'' });
-      cls.me = { name, kaId:nx.id, h:{} };
+      cls.me = { name, kaId:nx.id, h:{}, prev:null };
     } else {
       const x = d.data() || {};
-      cls.me = { name:x.name, kaId:x.kaId, h:x.h || {} };
+      cls.me = { name:x.name, kaId:x.kaId, h:x.h || {}, prev:x.prev || null };
       if (x.kaId !== nx.id) { await scoreRef(cid).update({ kaId:nx.id, h:{} }); cls.me.kaId = nx.id; cls.me.h = {}; }
       if (x.name !== name) { await scoreRef(cid).update({ name }); cls.me.name = name; }
     }
+    syncBoardMe(3600);
   } catch(e) { cls.me = null; }
 }
-const ansQ = []; let ansBusy = false, ansLast = 0;
-function classAnswer(q, tid, score, kid){
-  try {
-    kid = kid || ui.ka;
-    if (!fb.user || !q || !kid || kid !== classKaId() || !cls.me) return;
-    ansQ.push({ q:String(q.id || q.q || '').slice(0, 80), t:String(tid || '').slice(0, 40), s:Math.max(0, Math.min(1, Math.round(score * 100) / 100)), tries:0 });
-    pumpAnswers();
-  } catch(e) {}
+function histForBoard(kid){
+  const p = P[kid], h = {}; if (!p || !p.hist) return h;
+  topicsOf(kid).forEach(t => { const v = (p.hist[t.id] || []).filter(x => typeof x === 'number').slice(-10); if (v.length) h[t.id] = v; });
+  return h;
 }
-async function pumpAnswers(){
-  if (ansBusy) return; ansBusy = true;
+function sameH(a, b){
+  const ka = Object.keys(a || {}), kb = Object.keys(b || {});
+  return ka.length === kb.length && ka.every(k => Array.isArray(b[k]) && b[k].length === a[k].length && a[k].every((v, i) => v === b[k][i]));
+}
+const bsync = { t:null, last:0, retry:false };
+function syncBoardMe(delay){
+  clearTimeout(bsync.t);
+  bsync.t = setTimeout(doSyncBoard, Math.max(delay || 800, bsync.last + 3400 - Date.now()));
+}
+async function doSyncBoard(){
+  const cid = myClass(), me = cls.me, kid = classKaId(), nx = cls.info && cls.info.next;
+  if (!fb.user || !cid || !me || !kid || !nx || me.kaId !== nx.id || !P[kid]) return;
+  const h = histForBoard(kid);
+  if (sameH(h, me.h)) return;
+  const day = dayKey(), ts = topicsOf(kid);
+  const prev = me.prev && me.prev.day === day && me.prev.k === me.kaId ? me.prev : { day, r:readyFromH(me.h, ts), k:me.kaId };
+  bsync.last = Date.now();
   try {
-    while (ansQ.length) {
-      const wait = ansLast + 3300 - Date.now();
-      if (wait > 0) await new Promise(r => setTimeout(r, wait));
-      const a = ansQ[0], cid = myClass(), me = cls.me;
-      if (!fb.user || !cid || !me) { ansQ.length = 0; break; }
-      const ref = fb.fs.collection('classes/' + cid + '/scores/' + fb.user.uid + '/answers').doc();
-      const old = (me.h && me.h[a.t]) || [], next = (old.length < 20 ? old : old.slice(1, 20)).concat([a.s]);
-      const h = Object.assign({}, me.h || {}, { [a.t]:next }), now = firebase.firestore.FieldValue.serverTimestamp();
-      const batch = fb.fs.batch();
-      batch.set(ref, { q:a.q, t:a.t, s:a.s, kaId:me.kaId, at:now });
-      batch.update(scoreRef(cid), { h, lastAt:now, lastId:ref.id });
-      try {
-        await batch.commit(); me.h = h; ansQ.shift(); ansLast = Date.now();
-        if (cls.board) { let r = cls.board.find(x => x.uid === fb.user.uid); if (!r) cls.board.push(r = { uid:fb.user.uid, name:me.name, h:{} }); r.h = h; sortBoard(); paintBoard(); }
-      } catch(e) {
-        ansLast = Date.now();
-        if (++a.tries >= 3) ansQ.shift(); else await ensureScore();
-      }
-    }
-  } finally { ansBusy = false; }
+    await scoreRef(cid).update({ h, prev, lastAt:firebase.firestore.FieldValue.serverTimestamp() });
+    me.h = h; me.prev = prev; bsync.retry = false;
+  } catch(e) {
+    if (!bsync.retry) { bsync.retry = true; syncBoardMe(4000); } else bsync.retry = false;
+  }
+}
+function classAnswer(q, tid, score, kid){
+  kid = kid || ui.ka;
+  if (fb.user && kid && kid === classKaId()) syncBoardMe();
 }
 function boardReady(h){ return readyFromH(h, topicsOf(classKaId())); }
 function readyFromH(h, ts){
@@ -2503,23 +2511,30 @@ function readyFromH(h, ts){
   const vals = ts.map(t => { const v = Array.isArray(h[t.id]) ? h[t.id].filter(x => typeof x === 'number').slice(-10) : []; if (!v.length) return 0; const avg = v.reduce((x, y) => x + Math.max(0, Math.min(1, y)), 0) / v.length; return avg * Math.min(1, v.length / 5); });
   return Math.round(vals.reduce((x, y) => x + y, 0) / ts.length * 100);
 }
-function sortBoard(){ (cls.board || []).forEach(r => { r.ready = boardReady(r.h); }); (cls.board || []).sort((a, b) => b.ready - a.ready || a.name.localeCompare(b.name, 'de')); }
+function sortBoard(){
+  const kid = classKaId(), mine = fb.user && cls.me && (cls.board || []).find(r => r.uid === fb.user.uid);
+  if (mine && kid && P[kid]) mine.h = histForBoard(kid);
+  (cls.board || []).forEach(r => { r.ready = boardReady(r.h); }); (cls.board || []).sort((a, b) => b.ready - a.ready || a.name.localeCompare(b.name, 'de')); }
+function boardRow(d){
+  const x = d.data({ serverTimestamps:'estimate' }) || {};
+  return { uid:d.id, name:String(x.name || '?').slice(0, 30), h:x.h && typeof x.h === 'object' ? x.h : {}, at:x.lastAt && x.lastAt.toMillis ? x.lastAt.toMillis() : 0, prev:x.prev && typeof x.prev === 'object' ? x.prev : null };
+}
 async function loadBoard(){
   const cid = myClass();
   if (!fb.user || !cid || !cls.info || !cls.info.next) { cls.board = null; return; }
   try {
     const q = await fb.fs.collection('classes/' + cid + '/scores').where('kaId', '==', cls.info.next.id).get(), arr = [];
-    q.forEach(d => { const x = d.data() || {}; arr.push({ uid:d.id, name:String(x.name || '?').slice(0, 30), h:x.h && typeof x.h === 'object' ? x.h : {} }); });
+    q.forEach(d => arr.push(boardRow(d)));
     cls.board = arr; sortBoard();
   } catch(e) { cls.board = cls.board || []; }
   cls.boardAt = Date.now();
 }
-function boardVisible(){ return !!(fb.user && myClass()) && (ui.view === 'list' || ui.view === 'settings' || (ui.view === 'home' && ui.ka && ui.ka === classKaId())); }
+function boardVisible(){ return !!(fb.user && myClass()) && (ui.view === 'list' || ui.view === 'settings' || ui.view === 'board' || (ui.view === 'home' && ui.ka && ui.ka === classKaId())); }
 function classRefresh(){
   if (!fb.user || !myClass() || cls.loading) return;
   if (!boardVisible() || Date.now() - cls.boardAt < 60000) return;
   cls.loading = true; cls.boardAt = Date.now();
-  classSync().then(() => board.unsub ? null : loadBoard()).finally(() => { cls.loading = false; if (['list', 'home', 'settings'].includes(ui.view)) render(); });
+  classSync().then(() => board.unsub ? null : loadBoard()).finally(() => { cls.loading = false; if (['list', 'home', 'settings', 'board'].includes(ui.view)) render(); });
 }
 /* Live-Leaderboard: Listener nur, solange das Leaderboard sichtbar ist */
 const board = { unsub:null, key:'' };
@@ -2533,18 +2548,39 @@ function boardStart(){
   board.unsub = fb.fs.collection('classes/' + cid + '/scores').where('kaId', '==', nx.id).onSnapshot(snap => {
     if (board.key !== key) return;
     const arr = [];
-    snap.forEach(d => { const x = d.data() || {}; arr.push({ uid:d.id, name:String(x.name || '?').slice(0, 30), h:x.h && typeof x.h === 'object' ? x.h : {} }); });
+    snap.forEach(d => arr.push(boardRow(d)));
     cls.board = arr; sortBoard(); cls.boardAt = Date.now(); paintBoard();
   }, () => { if (board.key === key) boardStop(); });
 }
-function paintBoard(){ document.querySelectorAll('[data-board]').forEach(el => { el.innerHTML = boardHtml(+el.dataset.board || 0); }); }
+function paintBoard(){
+  document.querySelectorAll('[data-board]').forEach(el => {
+    const old = new Map(); el.querySelectorAll('li[data-uid]').forEach(li => old.set(li.dataset.uid, li.getBoundingClientRect().top));
+    el.innerHTML = boardHtml(+el.dataset.board || 0);
+    if (RM() || !old.size) return;
+    el.querySelectorAll('li[data-uid]').forEach(li => {
+      const t = old.get(li.dataset.uid); if (t == null) return;
+      const dy = t - li.getBoundingClientRect().top;
+      if (Math.abs(dy) > 1 && li.animate) li.animate([{ transform:'translateY(' + dy + 'px)' }, { transform:'none' }], { duration:450, easing:'cubic-bezier(.2,.8,.2,1)' });
+    });
+  });
+}
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') boardStop(); else if (boardVisible()) boardStart(); });
-function resetBoardMe(){
-  const cid = myClass(), me = cls.me;
-  if (!fb.user || !cid || !me) return;
-  ansQ.length = 0; me.h = {};
-  const r = cls.board && cls.board.find(x => x.uid === fb.user.uid); if (r) { r.h = {}; sortBoard(); }
-  scoreRef(cid).update({ h:{} }).catch(() => toast('Dein Leaderboard-Wert konnte nicht zurückgesetzt werden.'));
+function resetBoardMe(){ syncBoardMe(); }
+function agoText(ms){
+  const m = Math.round((Date.now() - ms) / 60000);
+  if (m < 2) return 'gerade aktiv'; if (m < 60) return 'vor ' + m + ' Min.';
+  const h = Math.round(m / 60); if (h < 24) return 'vor ' + h + ' Std.';
+  const d = Math.round(h / 24); return d === 1 ? 'gestern' : 'vor ' + d + ' Tagen';
+}
+function renderBoardView(){
+  const kid = classKaId(), a = kid && ka(kid);
+  if (!fb.user || !myClass() || !cls.info || !a) {
+    const msg = !fb.user ? 'Melde dich im Profil an und wähl deine Klasse.' : !myClass() ? 'Wähl im Profil deine Klasse.' : !cls.info ? 'Lädt …' : 'Sobald die nächste Klassenarbeit veröffentlicht ist, erscheint hier das Leaderboard.';
+    $main.innerHTML = `<div class="lt"><h1>Leaderboard</h1></div><div class="glass pad"><p style="margin:0">${msg}</p></div>`;
+    return;
+  }
+  $main.innerHTML = `<div class="lt"><h1>Leaderboard</h1></div><p class="sub">${esc(cls.info.name)} · ${esc(a.title)}</p>
+    <div class="glass pad board-card"><p class="cc-head" style="margin-top:0">Bereit-% <small>wie in deiner Übersicht · ↑↓ seit gestern</small></p><div data-board="0">${boardHtml()}</div></div>`;
 }
 function boardHtml(limit){
   const b = cls.board;
@@ -2553,16 +2589,22 @@ function boardHtml(limit){
   const me = fb.user && fb.user.uid;
   let rows = limit ? b.slice(0, limit) : b.slice();
   if (limit && !rows.some(r => r.uid === me)) { const mine = b.find(r => r.uid === me); if (mine) rows.push(mine); }
-  const medal = ['🥇', '🥈', '🥉'];
-  return `<ol class="board">${rows.map(r => { const rank = b.indexOf(r) + 1; return `<li class="${r.uid === me ? 'me' : ''}"><span class="bd-rank">${rank <= 3 ? medal[rank - 1] : rank + '.'}</span><span class="bd-name">${esc(r.name)}${r.uid === me ? ' <small>(du)</small>' : ''}</span><span class="bd-bar"><i style="width:${r.ready}%"></i></span><b class="bd-val">${r.ready} %</b></li>`; }).join('')}</ol>`;
+  const medal = ['🥇', '🥈', '🥉'], ts = topicsOf(classKaId()), nx = cls.info && cls.info.next;
+  return `<ol class="board">${rows.map(r => {
+    const rank = b.indexOf(r) + 1, n = ts.filter(t => Array.isArray(r.h[t.id]) && r.h[t.id].length).length;
+    const p = r.prev, tr = p && p.day === dayKey() && nx && p.k === nx.id && typeof p.r === 'number' ? r.ready - p.r : 0;
+    const trend = tr ? `<small class="bd-trend ${tr > 0 ? 'up' : 'down'}" aria-label="${tr > 0 ? 'plus' : 'minus'} ${Math.abs(tr)} Prozentpunkte seit gestern">${tr > 0 ? '↑' : '↓'}${Math.abs(tr)}</small>` : '';
+    const meta = limit ? '' : `<span class="bd-meta">${n}/${ts.length} Themen${r.at ? ' · ' + agoText(r.at) : ''}</span>`;
+    return `<li class="${r.uid === me ? 'me' : ''}" data-uid="${esc(r.uid)}"><span class="bd-rank">${rank <= 3 ? medal[rank - 1] : rank + '.'}</span><span class="bd-name">${esc(r.name)}${r.uid === me ? ' <small>(du)</small>' : ''}${meta}</span><span class="bd-bar"><i style="width:${r.ready}%"></i></span><b class="bd-val">${r.ready} %${trend}</b></li>`;
+  }).join('')}</ol>`;
 }
 function classCardHtml(){
   const kid = classKaId(), a = kid && ka(kid);
   if (!fb.user || !a || !cls.info) return '';
   return `<section style="${fachStyle(a.fachId)}"><h2 class="group-title"><i class="fdot" aria-hidden="true"></i>Nächste Klassenarbeit · ${esc(cls.info.name)}</h2>
     <div class="glass list classcard">${kaRow(a)}
-      <div class="cc-board"><p class="cc-head">Leaderboard <small>Bereit-% aus dem Quiz</small></p><div data-board="3">${boardHtml(3)}</div></div>
-      <button class="row add" data-open="${a.id}"><span class="add-ic">→</span><span class="row-title">Ganzes Leaderboard ansehen</span></button>
+      <div class="cc-board"><p class="cc-head">Leaderboard <small>Bereit-% wie in deiner Übersicht</small></p><div data-board="3">${boardHtml(3)}</div></div>
+      <button class="row add" data-view-go="board"><span class="add-ic">🏆</span><span class="row-title">Ganzes Leaderboard ansehen</span></button>
       <button class="row add" data-view-go="chat"><span class="add-ic">💬</span><span class="row-title">Klassenchat</span></button></div></section>`;
 }
 function classSectionHtml(){
@@ -3537,6 +3579,7 @@ function render(){
   else if (ui.view === 'settings') renderSettings();
   else if (ui.view === 'admin') renderAdmin();
   else if (ui.view === 'chat') renderChat();
+  else if (ui.view === 'board') renderBoardView();
   else if (!a) { ui.view = 'list'; renderList(); }
   else if (ui.view === 'home') renderHome();
   else if (ui.view === 'kb') renderKb();
@@ -4076,7 +4119,7 @@ function renderHome(){
     </section>
     <button class="glass next" data-next="${ns.act}" data-id="${ns.id}"><span class="next-ic">${ns.icon}</span>
       <span class="row-main"><span class="row-sub">Als Nächstes</span><span class="row-title">${esc(ns.title)}</span></span>${I.chev}</button>
-    ${fb.user && kid === classKaId() && cls.info ? `<h2 class="group-title">Leaderboard · ${esc(cls.info.name)}</h2><div class="glass pad board-card"><p class="cc-head" style="margin-top:0">Bereit-% aus dem Quiz <small>neue Ergebnisse ersetzen alte</small></p><div data-board="0">${boardHtml()}</div></div>` : ''}
+    ${fb.user && kid === classKaId() && cls.info ? `<div class="glass list board-card"><button class="row add" data-view-go="board"><span class="add-ic">🏆</span><span class="row-title">Leaderboard · ${esc(cls.info.name)}</span></button></div>` : ''}
     <h2 class="group-title">Lernpfad</h2>
     <div class="glass path">${rows || '<div class="step"><span class="row-sub">Noch keine Themen.</span></div>'}</div>
     <h2 class="group-title">Probeprüfung</h2>
