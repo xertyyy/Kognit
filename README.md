@@ -82,8 +82,15 @@ Stoff lesen · im Quiz üben · Probeprüfung schreiben
 
 ## 🔒 Datenschutz
 
-> [!NOTE]
-> Wenn du dich anmeldest, werden deine **E-Mail-Adresse** und dein **Lernstand** bei **Google Firebase** gespeichert. Andere Nutzer sehen deine Daten nicht. Lade beim eigenen Lernstoff keine privaten Daten in die KI hoch.
+| | |
+|---|---|
+| 👤 **Konto** | Deine **E-Mail-Adresse** und dein **Lernstand** werden bei **Google Firebase** gespeichert. |
+| 🎓 **Klasse** | Bist du in einer Klasse, sieht sie deinen **Vornamen**, dein **Bereit-%** im Leaderboard und deine **Chat-Nachrichten**. Deine E-Mail-Adresse sieht niemand. |
+| 🤖 **KI** | Was du an die KI schickst (Antworten, Code, Fragen), geht über **Cloudflare** an **OpenRouter** und den jeweiligen KI-Anbieter. Bei Gratis-Modellen können Eingaben gespeichert und zum Training genutzt werden. |
+| 👋 **Gast** | Es wird nichts in der Cloud gespeichert, die KI ist aus. |
+
+> [!IMPORTANT]
+> **Schick der KI keine privaten Daten**, auch nicht beim eigenen Lernstoff.
 
 ---
 
