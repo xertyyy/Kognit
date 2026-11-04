@@ -1093,6 +1093,19 @@ main .btn,main .chip,main .navbtn,main .themebtn{-webkit-backdrop-filter:saturat
 .board .bd-trend.down{color:var(--red)}
 /* ---------- Prüfungsauswertung: mehrzeilige Antworten ---------- */
 .exr-pre{white-space:pre-wrap}
+/* ---------- Updates-Leiste (nur PC, links neben dem Inhalt) ---------- */
+.upd-side{display:none}
+@media (min-width:1180px){
+  .upd-side{display:block;position:fixed;z-index:6;top:calc(env(safe-area-inset-top,0px) + 84px);right:calc(50% + 380px + 22px);width:min(250px,calc(50vw - 380px - 44px));
+    max-height:calc(100vh - 230px);overflow:auto;scrollbar-width:none;padding:16px 12px 14px;border-radius:22px;animation:fade-in .4s ease both}
+  .upd-side::-webkit-scrollbar{display:none}
+  .upd-side:empty{display:none}
+  .upd-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+  .upd-list li{padding:0 8px}
+  .upd-date{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--label3)}
+  .upd-new{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;color:var(--fach);background:rgba(var(--fach-rgb),.14)}
+  .upd-list p{margin:3px 0 0;font-size:14px;line-height:1.4;color:var(--label)}
+}
 </style>
 </head>
 <body>
@@ -1116,6 +1129,7 @@ try{mq.addEventListener('change',lab)}catch(e){}lab();})();
 </script>
 <div class="navbar" id="navbar" aria-hidden="true"><span id="navtitle"></span></div>
 <main id="main"></main>
+<aside id="updside" class="glass upd-side" aria-label="Updates"></aside>
 <nav class="tabs" aria-label="Bereiche"><button type="button" class="timer-fab set-fab" id="setfab" aria-label="Profil und Einstellungen"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg></span><span class="lb">Profil</span></button><div class="bar"><span class="lens" aria-hidden="true"></span>
   <button data-view="list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5-9 4.5z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/></svg><span>Fächer</span></button>
   <button data-view="home"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 3.5v4"/></svg><span>Übersicht</span></button>
@@ -4908,6 +4922,17 @@ setInterval(tick, 60000);
 render();
 navPush();
 connect();
+/* ---------- Updates-Leiste (nur PC): neueste Einträge oben, kurz und in Du-Form ---------- */
+const UPDATES = [
+  { d:'2026-11-04', t:'Die KI bewertet freie Antworten fairer: Wenn du das Wichtigste verstanden hast, gibt es die volle Punktzahl.' },
+  { d:'2026-11-04', t:'Bei Code-Fragen siehst du die Musterlösung jetzt als richtigen Code mit Farben, wie im Editor.' },
+];
+(function(){
+  const el = document.getElementById('updside'); if (!el || !UPDATES.length) return;
+  const day = s => new Date(s + 'T00:00').getTime(), fmt = s => s.split('-').reverse().join('.');
+  el.innerHTML = '<p class="ts-title">Updates</p><ul class="upd-list">' + UPDATES.slice(0, 10).map(u =>
+    `<li><span class="upd-date">${fmt(u.d)}${Date.now() - day(u.d) < 3 * 864e5 ? '<b class="upd-new">Neu</b>' : ''}</span><p>${esc(u.t)}</p></li>`).join('') + '</ul>';
+})();
 })();
 
 </script>
