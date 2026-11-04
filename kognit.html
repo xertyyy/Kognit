@@ -1106,6 +1106,28 @@ main .btn,main .chip,main .navbtn,main .themebtn{-webkit-backdrop-filter:saturat
   .upd-new{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;color:var(--fach);background:rgba(var(--fach-rgb),.14)}
   .upd-list p{margin:3px 0 0;font-size:14px;line-height:1.4;color:var(--label)}
 }
+/* ---------- KI-Chat als Blase unten rechts (nur in Wissen) ---------- */
+.kichat[hidden]{display:none}
+.kichat{position:fixed;z-index:32;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(var(--tabbar) + 18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none}
+.kichat-fab{pointer-events:auto;position:relative;width:54px;height:54px;border-radius:50%;display:grid;place-items:center;cursor:pointer;padding:0;color:var(--fach);border:1px solid var(--glass-edge);
+  background-color:var(--glass);-webkit-backdrop-filter:blur(36px) saturate(220%) brightness(1.05);backdrop-filter:blur(36px) saturate(220%) brightness(1.05);box-shadow:0 10px 30px rgba(0,0,0,.25);transition:transform .3s var(--spring-soft)}
+.kichat-fab:active{transform:scale(.9);transition-duration:.12s}
+.kichat-fab svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.kichat-fab .kc-badge{position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;padding:0 6px;border-radius:999px;display:grid;place-items:center;font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;color:#FFFFFF;background:var(--fach)}
+.kichat-fab .kc-badge.low{background:var(--red,#FF3B30)}
+.kichat.open .kichat-fab .kc-badge{display:none}
+.kichat-panel{pointer-events:none;width:min(360px,calc(100vw - 32px));max-height:min(520px,calc(100vh - var(--tabbar) - 140px));display:flex;flex-direction:column;padding:14px 14px 10px;border-radius:24px;
+  opacity:0;transform:translateY(14px) scale(.96);transform-origin:bottom right;transition:opacity .22s ease,transform .4s var(--spring-soft)}
+.kichat.open .kichat-panel{pointer-events:auto;opacity:1;transform:none}
+.kc-head{display:flex;align-items:center;gap:8px;margin:0 2px 8px}
+.kc-head b{font-size:15px}
+.kc-topic{flex:1;min-width:0;font-size:12.5px;color:var(--label2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kc-x{border:0;background:var(--fill);color:var(--label2);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:17px;line-height:1;display:grid;place-items:center}
+.kc-msgs{flex:1;min-height:80px;overflow-y:auto;padding:0 2px;font-size:14.5px;line-height:1.45}
+.kc-msgs p{margin:8px 0;white-space:pre-wrap}
+.kc-in{display:flex;gap:8px;margin-top:8px}
+.kc-in input{flex:1;min-width:0}
+.kc-left{margin:8px 2px 0;font-size:12px;color:var(--label3);text-align:right;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -1130,6 +1152,7 @@ try{mq.addEventListener('change',lab)}catch(e){}lab();})();
 <div class="navbar" id="navbar" aria-hidden="true"><span id="navtitle"></span></div>
 <main id="main"></main>
 <aside id="updside" class="glass upd-side" aria-label="Updates"></aside>
+<div id="kichat" class="kichat" hidden><div id="kipanel" class="glass kichat-panel" role="dialog" aria-label="KI-Chat" inert></div><button id="kifab" class="kichat-fab" type="button" aria-label="KI fragen" aria-expanded="false"></button></div>
 <nav class="tabs" aria-label="Bereiche"><button type="button" class="timer-fab set-fab" id="setfab" aria-label="Profil und Einstellungen"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg></span><span class="lb">Profil</span></button><div class="bar"><span class="lens" aria-hidden="true"></span>
   <button data-view="list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5-9 4.5z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/></svg><span>Fächer</span></button>
   <button data-view="home"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><path d="M12 3.5v4"/></svg><span>Übersicht</span></button>
@@ -3424,6 +3447,7 @@ function enhance(){
   if (art) { decorateBoxes(art); buildToc(art); }
   else { const x = document.getElementById('tocside'); if (x) x.remove(); }
   highlightCode($main);
+  paintTchat();
 }
 
 /* ---------- F7 Erklär's mir anders ---------- */
@@ -3470,28 +3494,63 @@ Antworte nur mit JSON: {"html":"..."}`;
 /* ---------- Lern-Chat zum Thema ---------- */
 /* KI-Text: `code` als Code anzeigen, sonst nur Text */
 function kiText(s){ return esc(s).replace(/`([^`\n]{1,120})`/g, '<code>$1</code>'); }
+/* Limit für den KI-Chat: pro Gerät und Tag, plus Mindestabstand (bewusst einfach, der Worker begrenzt zusätzlich pro Minute) */
+const KC_DAY = 40, KC_GAP = 5000, KC_KEY = 'kognit-kichat';
+function kcGet(){ let o = null; try { o = JSON.parse(localStorage.getItem(KC_KEY)); } catch(e) {} const d = dayKey(); if (!o || o.day !== d) o = { day:d, n:0, last:0 }; return o; }
+function kcSet(o){ try { localStorage.setItem(KC_KEY, JSON.stringify(o)); } catch(e) {} }
+function kcLeft(){ return Math.max(0, KC_DAY - kcGet().n); }
 function tchatInner(t){
-  const c = ui.tchat && ui.tchat.id === t.id ? ui.tchat : { msgs:[] };
-  const msgs = c.msgs.map(m => `<p style="white-space:pre-wrap;margin:8px 0"><b>${m.r === 'u' ? 'Du' : 'KI'}:</b> ${m.r === 'u' ? esc(m.t) : kiText(m.t)}</p>`).join('');
-  return `<details class="tchat" ${c.msgs.length ? 'open' : ''}><summary>${I.spark.replace('<svg ', '<svg style="width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;vertical-align:-4px;margin-right:4px" ')}Frag die KI zu diesem Thema</summary>
-    ${msgs || '<p class="hint">Stell eine Frage zum Thema. Die KI antwortet auf Grundlage dieser Lernseite. Prüf Wichtiges trotzdem im Unterricht nach.</p>'}${c.busy ? '<p class="hint">KI denkt nach …</p>' : ''}
-    <div class="row-actions"><input type="text" id="tcin" maxlength="500" style="flex:1;min-width:0" placeholder="Deine Frage …" aria-label="Frage an die KI" value="${esc(c.draft || '')}" ${c.busy ? 'disabled' : ''}><button class="btn small" data-tcsend ${c.busy ? 'disabled' : ''}>Fragen</button></div></details>`;
+  const c = ui.tchat && ui.tchat.id === t.id ? ui.tchat : { msgs:[] }, left = kcLeft();
+  const msgs = c.msgs.map(m => `<p><b>${m.r === 'u' ? 'Du' : 'KI'}:</b> ${m.r === 'u' ? esc(m.t) : kiText(m.t)}</p>`).join('');
+  return `<div class="kc-head"><b>Frag die KI</b><span class="kc-topic">${esc(t.title)}</span><button class="kc-x" type="button" data-tcclose aria-label="Chat schließen">×</button></div>
+    <div class="kc-msgs">${msgs || '<p class="hint">Stell eine Frage zu diesem Thema. Die KI antwortet auf Grundlage der Lernseite. Prüf Wichtiges trotzdem im Unterricht nach.</p>'}${c.busy ? '<p class="hint">KI denkt nach …</p>' : ''}</div>
+    <div class="kc-in"><input type="text" id="tcin" maxlength="500" placeholder="${left ? 'Deine Frage …' : 'Für heute aufgebraucht'}" aria-label="Frage an die KI" value="${esc(ui.tcDraft || '')}" ${c.busy || !left ? 'disabled' : ''}><button class="btn small" type="button" data-tcsend ${c.busy || !left ? 'disabled' : ''}>Senden</button></div>
+    <p class="kc-left">Noch ${left} von ${KC_DAY} Fragen heute</p>`;
 }
 function paintTchat(){
-  const art = $main.querySelector('article.kb'), t = topicOf(ui.ka, ui.kb); if (!art || !t) return;
-  const slot = art.querySelector('.tchat-slot'); if (slot) slot.innerHTML = tchatInner(t);
+  const box = document.getElementById('kichat'), pan = document.getElementById('kipanel'), fab = document.getElementById('kifab'); if (!box) return;
+  const t = ui.view === 'kb' && kiOn() ? topicOf(ui.ka, ui.kb) : null;
+  box.hidden = !t; if (!t) return;
+  const inp = document.getElementById('tcin'), hadFocus = inp && document.activeElement === inp;
+  if (inp) ui.tcDraft = inp.value;
+  const open = !!ui.tchatOpen, left = kcLeft();
+  box.classList.toggle('open', open); fab.setAttribute('aria-expanded', String(open)); pan.inert = !open;
+  fab.innerHTML = I.spark + `<span class="kc-badge${left <= 5 ? ' low' : ''}" aria-hidden="true">${left}</span>`;
+  fab.setAttribute('aria-label', 'KI fragen, noch ' + left + ' Fragen heute');
+  pan.innerHTML = tchatInner(t);
+  const m = pan.querySelector('.kc-msgs'); if (m) m.scrollTop = m.scrollHeight;
+  const ni = document.getElementById('tcin'); if (hadFocus && ni && !ni.disabled) ni.focus();
+}
+function tchatToggle(on){
+  ui.tchatOpen = on === undefined ? !ui.tchatOpen : on; paintTchat();
+  if (ui.tchatOpen) { const i = document.getElementById('tcin'); if (i && !i.disabled) setTimeout(() => i.focus(), 60); }
+  else document.getElementById('kifab').focus();
 }
 async function tchatSend(){
-  const t = topicOf(ui.ka, ui.kb), inp = $main.querySelector('#tcin'); if (!t || !inp || !kiOn()) return;
+  const t = topicOf(ui.ka, ui.kb), inp = document.getElementById('tcin'); if (!t || !inp || !kiOn()) return;
   const q = inp.value.trim(); if (!q) { inp.focus(); return; }
   if (!ui.tchat || ui.tchat.id !== t.id) ui.tchat = { id:t.id, msgs:[] };
   const c = ui.tchat; if (c.busy) return;
+  const lim = kcGet(), now = Date.now();
+  if (lim.n >= KC_DAY) { toast('Du hast heute schon ' + KC_DAY + ' Fragen gestellt. Morgen geht’s weiter.'); return; }
+  if (now - lim.last < KC_GAP) { toast('Kurz warten, dann kannst du die nächste Frage stellen.'); return; }
+  lim.n++; lim.last = now; kcSet(lim);
   const history = c.msgs.slice(-6);
-  c.msgs.push({ r:'u', t:q }); c.draft = ''; c.busy = true; paintTchat();
+  c.msgs.push({ r:'u', t:q }); ui.tcDraft = ''; inp.value = ''; c.busy = true; paintTchat();
   try { const d = await ki('chat', { title:t.title, page:plain(t.html || t.facts || '').slice(0, 6000), history, question:q }); c.msgs.push({ r:'a', t:String(d.text || '').slice(0, 2000) }); }
-  catch(e) { c.msgs.pop(); c.draft = q; toast(e.message || 'Das hat nicht geklappt.'); }
+  catch(e) { c.msgs.pop(); ui.tcDraft = q; const l = kcGet(); if (l.n > 0) { l.n--; kcSet(l); } toast(e.message || 'Das hat nicht geklappt.'); }
   c.busy = false; if (c.msgs.length > 20) c.msgs = c.msgs.slice(-20); paintTchat();
+  if (ui.tchatOpen && ui.view === 'kb' && ui.kb === t.id) { const i = document.getElementById('tcin'); if (i && !i.disabled) i.focus(); }
 }
+(function(){
+  const box = document.getElementById('kichat'); if (!box) return;
+  box.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return;
+    if (b.id === 'kifab') tchatToggle(); else if ('tcclose' in b.dataset) tchatToggle(false); else if ('tcsend' in b.dataset) tchatSend(); });
+  box.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.id === 'tcin') { e.preventDefault(); tchatSend(); }
+    else if (e.key === 'Escape' && ui.tchatOpen) { e.preventDefault(); tchatToggle(false); }
+  });
+})();
 
 /* ---------- F9 Statistik und D8 Lernkalender ---------- */
 function dayKey(d){ d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -4211,7 +4270,7 @@ function kbArticle(t){
   else body = `<div class="tip">Für dieses Thema fehlt noch die Lernseite.</div><p style="white-space:pre-wrap">${esc(t.facts || '')}</p>
     ${ui.sample ? `<button class="btn small" data-filltopic="${t.id}" ${ui.genBusy ? 'disabled' : ''}>${ui.genBusy ? 'Claude schreibt …' : 'Lernseite erzeugen'}</button>` : ''}`;
   return `<article class="glass kb"><div class="kb-head">${ticon(t, true)}<h2 class="kb-title">${esc(t.title)}</h2></div>
-    ${ui.sample || kiOn() || altList(t).length ? `<button class="btn small ghost alt-btn" data-altexplain ${ui.altBusy ? 'disabled' : ''}>${I.spark} Erklär’s mir anders</button>` : ''}<div class="alt-slot">${altInner(t)}</div>${body}${kiOn() ? `<div class="tchat-slot">${tchatInner(t)}</div>` : ''}
+    ${ui.sample || kiOn() || altList(t).length ? `<button class="btn small ghost alt-btn" data-altexplain ${ui.altBusy ? 'disabled' : ''}>${I.spark} Erklär’s mir anders</button>` : ''}<div class="alt-slot">${altInner(t)}</div>${body}
       <div class="kb-actions">
         <button class="btn ${done ? 'tinted' : ''}" data-toggle="${t.id}">${done ? I.check + ' Gelesen' : 'Als gelesen abhaken'}</button>
         <button class="btn ghost" data-practice="${t.id}">${I.bolt} Üben</button>
@@ -4688,7 +4747,6 @@ $main.addEventListener('beforeinput', e => {
 $main.addEventListener('keydown', e => {
   if (e.key === 'Tab' && e.target.matches('textarea.codein') && !e.target.readOnly) { e.preventDefault(); const t = e.target, a = t.selectionStart, b = t.selectionEnd; t.value = t.value.slice(0, a) + '    ' + t.value.slice(b); t.selectionStart = t.selectionEnd = a + 4; t.dispatchEvent(new Event('input', { bubbles:true })); return; }
   if (e.key === 'Enter' && !e.shiftKey && e.target.id === 'chatin') { e.preventDefault(); chatSend(); return; }
-  if (e.key === 'Enter' && e.target.id === 'tcin') { e.preventDefault(); tchatSend(); return; }
   if (e.key === 'Enter' && e.target.matches('input[data-f]')) { e.preventDefault(); const b = $main.querySelector('[data-checkcalc],[data-nextq]'); if (b) b.click(); }
   if (e.key === 'Enter' && e.target.id === 'newfach') { e.preventDefault(); $main.querySelector('[data-addfach]').click(); }
   // Quiz per Tastatur: 1–4 oder A–D wählt eine Antwort, Enter prüft bzw. geht weiter
@@ -4758,7 +4816,6 @@ $main.addEventListener('click', async e => {
   else if (d.kb) { if (d.kb !== ui.kb) { ui.alt = null; switchKb(d.kb); } }
   else if (d.goto) { const h = document.getElementById(d.goto); if (h) h.scrollIntoView({ behavior:RM() ? 'auto' : 'smooth', block:'start' }); t.blur(); }
   else if ('altexplain' in d) explainOther();
-  else if ('tcsend' in d) tchatSend();
   else if ('altclose' in d) { ui.alt = null; paintAlt(); }
   else if (d.toggle) {
     const p = P[kid], id = d.toggle; p.done[id] = !p.done[id]; if (p.done[id]) bumpDay(p); persist('prog-' + kid, p); haptic(true);
