@@ -3602,6 +3602,7 @@ function afterCheck(score){ ui.anim = true; ui.streak = score >= .999 ? (ui.stre
 /* ---------- Rahmen ---------- */
 function render(){
   $main.classList.remove('fx-ans');
+  { const u = document.getElementById('updside'); if (u) u.style.display = (ui.view === 'quiz' || ui.view === 'exam') ? 'none' : ''; }   // Updates-Leiste nicht in Quiz/Prüfung
   const a = ka(ui.ka);
   document.querySelectorAll('nav.tabs button[data-view]').forEach(b => {
     const v = b.dataset.view;
