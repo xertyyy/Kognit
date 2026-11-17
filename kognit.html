@@ -1139,6 +1139,45 @@ main .btn,main .chip,main .navbtn,main .themebtn{-webkit-backdrop-filter:saturat
 .kc-wait{color:var(--label2);animation:kcpulse 1.2s ease-in-out infinite}
 @keyframes kcpulse{50%{opacity:.45}}
 @media (prefers-reduced-motion:reduce){.kc-wait{animation:none}}
+/* ---------- Notizblock rechts im Quiz (nur PC) ---------- */
+:root{--npw:clamp(300px,28vw,440px)}
+.np,.np-tab{display:none}
+@media (min-width:1100px){
+  body.np-quiz.np-open main{max-width:min(760px,calc(100vw - var(--npw) - 66px));margin-left:max(18px,calc((100vw - var(--npw) - 44px - 760px) / 2));margin-right:auto}
+  body.np-quiz.np-open .np{display:flex}
+  body.np-quiz:not(.np-open) .np-tab{display:flex}
+  .np{position:fixed;z-index:6;top:calc(env(safe-area-inset-top,0px) + 84px);right:22px;bottom:calc(var(--tabbar) + 22px + env(safe-area-inset-bottom,0px));width:var(--npw);
+    flex-direction:column;padding:10px 10px 8px;border-radius:22px;animation:fade-in .3s ease both}
+  .np-tab{position:fixed;z-index:6;right:0;top:50%;transform:translateY(-50%);writing-mode:vertical-rl;align-items:center;gap:8px;padding:14px 8px;border:1px solid var(--glass-edge);border-right:0;
+    border-radius:14px 0 0 14px;background-color:var(--glass);-webkit-backdrop-filter:blur(36px) saturate(220%);backdrop-filter:blur(36px) saturate(220%);color:var(--label);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+  .np-tab svg{width:16px;height:16px;transform:rotate(90deg)}
+}
+.np svg,.np-tab svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.np-head{display:flex;align-items:center;gap:8px;margin:0 4px 8px}
+.np-head b{font-size:15px}
+.np-head span{flex:1;min-width:0;font-size:12.5px;color:var(--label2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-bar{display:flex;flex-wrap:wrap;gap:2px;padding:4px;border-radius:12px;background:var(--fill);position:relative}
+.np-bar i{width:1px;align-self:stretch;margin:4px 3px;background:var(--glass-edge,rgba(128,128,128,.3))}
+.np-b{min-width:30px;height:30px;padding:0 6px;border:0;border-radius:8px;background:none;color:var(--label);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;display:inline-grid;place-items:center;line-height:1}
+.np-b:hover{background:var(--fill)}
+.np-b[aria-pressed="true"]{background:rgba(var(--fach-rgb),.2);color:var(--fach)}
+.np-b svg{width:17px;height:17px}
+.np-b.c{position:relative}
+.np-b.c u{position:absolute;left:7px;right:7px;bottom:4px;height:3px;border-radius:2px;background:var(--np-c,currentColor)}
+.np-pop{position:absolute;z-index:2;top:calc(100% + 6px);display:flex;flex-wrap:wrap;gap:6px;width:164px;padding:8px;border-radius:12px;background:var(--bg2,var(--glass));border:1px solid var(--glass-edge);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.np-pop[hidden]{display:none}
+.np-sw{width:26px;height:26px;border-radius:50%;border:1px solid rgba(128,128,128,.4);cursor:pointer;padding:0;font-size:13px;color:var(--label)}
+.np-ed{flex:1;min-height:0;overflow:auto;margin-top:8px;padding:10px 12px;border-radius:12px;outline:none;font-size:var(--npfs,14.5px);line-height:1.5;overflow-wrap:anywhere;cursor:text}
+.np-ed:focus{box-shadow:inset 0 0 0 1.5px rgba(var(--fach-rgb),.45)}
+.np-ed:empty::before{content:attr(data-ph);color:var(--label3);pointer-events:none}
+.np-ed h1{font-size:1.4em;margin:.4em 0 .2em}.np-ed h2{font-size:1.15em;margin:.4em 0 .2em}
+.np-ed p,.np-ed div{margin:0}
+.np-ed ul,.np-ed ol{margin:.2em 0;padding-left:1.4em}
+.np-ed blockquote{margin:0 0 0 1.4em}
+.np-ed code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;padding:1px 5px;border-radius:5px;background:var(--fill)}
+.np-ed pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;margin:.3em 0;padding:8px 10px;border-radius:8px;background:var(--fill);white-space:pre-wrap}
+.np-ed hr{border:0;border-top:1px solid var(--glass-edge,rgba(128,128,128,.35));margin:.6em 0}
+.np-foot{display:flex;justify-content:space-between;margin:6px 4px 0;font-size:12px;color:var(--label3);font-variant-numeric:tabular-nums}
 .kc-in{display:flex;gap:8px;margin-top:8px}
 .kc-in input{flex:1;min-width:0}
 .kc-left{margin:8px 2px 0;font-size:12px;color:var(--label3);text-align:right;font-variant-numeric:tabular-nums}
@@ -1166,6 +1205,8 @@ try{mq.addEventListener('change',lab)}catch(e){}lab();})();
 <div class="navbar" id="navbar" aria-hidden="true"><span id="navtitle"></span></div>
 <main id="main"></main>
 <aside id="updside" class="glass upd-side" aria-label="Updates"></aside>
+<aside id="notepad" class="glass np" aria-label="Notizblock"></aside>
+<button id="nptab" class="np-tab" type="button" aria-label="Notizblock öffnen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"/><path d="M8.5 12h7M8.5 16h5"/></svg>Notizen</button>
 <div id="kichat" class="kichat" hidden><div id="kipanel" class="glass kichat-panel" role="dialog" aria-label="KI-Chat" inert></div><button id="kifab" class="kichat-fab" type="button" aria-label="KI fragen" aria-expanded="false"></button></div>
 <nav class="tabs" aria-label="Bereiche"><button type="button" class="timer-fab set-fab" id="setfab" aria-label="Profil und Einstellungen"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg></span><span class="lb">Profil</span></button><div class="bar"><span class="lens" aria-hidden="true"></span>
   <button data-view="list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5 12 3l9 4.5-9 4.5z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/></svg><span>Fächer</span></button>
@@ -3505,6 +3546,144 @@ Antworte nur mit JSON: {"html":"..."}`;
   ui.altBusy = false; if (!ui.alt && altList(t).length) showPrepared(t); else paintAlt();
 }
 
+/* ---------- Notizblock rechts im Quiz (nur PC), pro Klassenarbeit lokal gespeichert ---------- */
+const NP_KEY = 'kognit-notepad-v1', NP_OPEN = 'kognit-notepad-open', NP_FS = 'kognit-notepad-fs';
+const np = { ka:null, t:0, init:false };
+const NP_TAGS = new Set(['B','STRONG','I','EM','U','S','STRIKE','DEL','CODE','PRE','H1','H2','H3','P','DIV','BR','UL','OL','LI','SPAN','FONT','HR','SUB','SUP','BLOCKQUOTE']);
+const NP_SV = p => `<svg viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
+const NP_IC = {
+  undo:NP_SV('<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'), redo:NP_SV('<path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>'),
+  ul:NP_SV('<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>'),
+  ol:NP_SV('<path d="M10 6h10M10 12h10M10 18h10M4 4.5h1.5V9M3.5 9h3M3.5 14.5c.4-.6 1-.9 1.6-.9.8 0 1.4.5 1.4 1.2 0 1-3 2.2-3 3.7h3"/>'),
+  out:NP_SV('<path d="M11 6h9M11 12h9M11 18h9M7 9l-3 3 3 3"/>'), ind:NP_SV('<path d="M11 6h9M11 12h9M11 18h9M4 9l3 3-3 3"/>'),
+  hr:NP_SV('<path d="M3 12h18"/>'), clr:NP_SV('<path d="M6 5h11M11 5 8 19M14 14l6 6M20 14l-6 6"/>'),
+  copy:NP_SV('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h9"/>'), del:NP_SV('<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'),
+  hide:NP_SV('<path d="m9 6 6 6-6 6"/>'), pre:NP_SV('<path d="m8 8-4 4 4 4M16 8l4 4-4 4"/>')
+};
+const NP_COLORS = [['Standard','#010203'],['Rot','#FF453A'],['Orange','#FF9F0A'],['Grün','#30D158'],['Blau','#0A84FF'],['Lila','#BF5AF2'],['Pink','#FF375F'],['Grau','#8E8E93']];
+const NP_MARKS = [['Keine','#010203'],['Gelb','rgba(255,214,10,.38)'],['Grün','rgba(48,209,88,.32)'],['Blau','rgba(10,132,255,.32)'],['Rot','rgba(255,69,58,.32)'],['Lila','rgba(191,90,242,.32)']];
+function npStore(){ try { return JSON.parse(localStorage.getItem(NP_KEY)) || {}; } catch(e) { return {}; } }
+function npClean(html){
+  const root = new DOMParser().parseFromString('<div>' + String(html || '') + '</div>', 'text/html').body.firstChild;
+  (function walk(el){ [...el.children].forEach(c => {
+    if (!NP_TAGS.has(c.tagName)) { if (/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|SVG|MATH|TEMPLATE|IMG|VIDEO|AUDIO)$/i.test(c.tagName)) c.remove(); else { walk(c); c.replaceWith(...c.childNodes); } return; }
+    const col = c.style.color, bg = c.style.backgroundColor, al = c.style.textAlign, fw = c.style.fontWeight, fst = c.style.fontStyle, td = c.style.textDecorationLine, fc = c.tagName === 'FONT' ? c.getAttribute('color') : '';
+    [...c.attributes].forEach(a => c.removeAttribute(a.name));
+    if (col) c.style.color = col; if (bg) c.style.backgroundColor = bg; if (/^(left|center|right)$/.test(al)) c.style.textAlign = al; if (/^(bold|[6-9]00)$/.test(fw)) c.style.fontWeight = 'bold'; if (fst === 'italic') c.style.fontStyle = 'italic'; if (/^(underline|line-through|underline line-through)$/.test(td)) c.style.textDecorationLine = td;
+    if (fc && /^(#[0-9a-f]{3,8}|[a-z]+)$/i.test(fc)) c.setAttribute('color', fc);
+    walk(c);
+  }); })(root);
+  return root ? root.innerHTML : '';
+}
+function npInit(){
+  const box = document.getElementById('notepad'); if (!box || np.init) return; np.init = true;
+  const b = (cmd, label, title, extra = '') => `<button class="np-b${extra}" type="button" data-np="${cmd}" title="${title}" aria-label="${title}">${label}</button>`;
+  const sw = (list, kind) => list.map(([n, c]) => `<button class="np-sw" type="button" data-np="${kind}" data-v="${c}" title="${n}" aria-label="${n}" style="background:${c === '#010203' ? 'transparent' : c}">${c === '#010203' ? '∅' : ''}</button>`).join('');
+  box.innerHTML = `<div class="np-head"><b>Notizen</b><span id="npka"></span><button class="np-b" type="button" data-np="close" title="Notizblock einklappen" aria-label="Notizblock einklappen">${NP_IC.hide}</button></div>
+    <div class="np-bar" role="toolbar" aria-label="Formatierung">
+      ${b('undo', NP_IC.undo, 'Rückgängig (Strg+Z)')}${b('redo', NP_IC.redo, 'Wiederholen (Strg+Y)')}<i></i>
+      ${b('p', 'T', 'Normaler Text')}${b('h1', 'H1', 'Große Überschrift')}${b('h2', 'H2', 'Kleine Überschrift')}${b('pre', NP_IC.pre, 'Codeblock')}<i></i>
+      ${b('bold', '<b>B</b>', 'Fett (Strg+B)')}${b('italic', '<span style="font-style:italic;font-family:Georgia,serif;font-size:16px;font-weight:700">I</span>', 'Kursiv (Strg+I)')}${b('underline', '<u>U</u>', 'Unterstrichen (Strg+U)')}${b('strikeThrough', '<s>S</s>', 'Durchgestrichen')}${b('code', '<span style="font-family:ui-monospace,Menlo,monospace;font-size:12px">&lt;/&gt;</span>', 'Code im Text (Strg+E)')}<i></i>
+      ${b('pc', 'A<u></u>', 'Textfarbe', ' c')}${b('pm', '<span style="padding:0 3px;border-radius:3px;background:rgba(255,214,10,.45)">ab</span>', 'Markieren')}<i></i>
+      ${b('insertUnorderedList', NP_IC.ul, 'Aufzählung')}${b('insertOrderedList', NP_IC.ol, 'Nummerierte Liste')}${b('outdent', NP_IC.out, 'Einzug verkleinern (Umschalt+Tab)')}${b('indent', NP_IC.ind, 'Einzug vergrößern (Tab)')}<i></i>
+      ${b('superscript', 'x²', 'Hochgestellt, z. B. 2^64')}${b('subscript', 'x₂', 'Tiefgestellt, z. B. 1010₂')}${b('insertHorizontalRule', NP_IC.hr, 'Trennlinie')}${b('removeFormat', NP_IC.clr, 'Formatierung entfernen')}<i></i>
+      ${b('fs-', 'A−', 'Schrift kleiner')}${b('fs+', 'A+', 'Schrift größer')}${b('copy', NP_IC.copy, 'Alles als Text kopieren')}${b('clear', NP_IC.del, 'Notizen leeren')}
+      <div class="np-pop" id="nppc" hidden>${sw(NP_COLORS, 'fc')}</div><div class="np-pop" id="nppm" hidden>${sw(NP_MARKS, 'mk')}</div>
+    </div>
+    <div class="np-ed" id="nped" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Notizen" data-ph="Präfixe, Zwischenergebnisse, Merksätze … Wird automatisch gespeichert."></div>
+    <div class="np-foot"><span id="npcnt"></span><span id="npst"></span></div>`;
+  const ed = document.getElementById('nped');
+  try { const fs = +localStorage.getItem(NP_FS); if (fs) ed.style.setProperty('--npfs', fs + 'px'); } catch(e) {}
+  const bar = box.querySelector('.np-bar');
+  bar.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });   // Auswahl im Text behalten
+  box.addEventListener('click', e => { const t = e.target.closest('[data-np]'); if (t) npCmd(t.dataset.np, t.dataset.v, t); });
+  document.addEventListener('mousedown', e => { if (!e.target.closest('.np-pop,[data-np="pc"],[data-np="pm"]')) box.querySelectorAll('.np-pop').forEach(p => p.hidden = true); });
+  ed.addEventListener('input', npChanged);
+  ed.addEventListener('paste', e => { e.preventDefault(); const t = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, t); });
+  ed.addEventListener('keydown', e => {
+    if (e.key === 'Tab') { e.preventDefault(); document.execCommand(e.shiftKey ? 'outdent' : 'indent'); }
+    else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'e') { e.preventDefault(); npCmd('code'); }
+    e.stopPropagation();
+  });
+  ['keyup', 'mouseup'].forEach(ev => ed.addEventListener(ev, npState));
+  document.addEventListener('selectionchange', () => { if (document.activeElement === ed) npState(); });
+  document.getElementById('nptab').addEventListener('click', () => npOpen(true));
+}
+function npCmd(c, v, el){
+  const ed = document.getElementById('nped'); if (!ed) return;
+  const pop = id => { const p = document.getElementById(id), r = el.offsetLeft; document.querySelectorAll('.np-pop').forEach(x => { if (x !== p) x.hidden = true; }); p.style.left = Math.max(0, Math.min(r, el.parentElement.clientWidth - 172)) + 'px'; p.hidden = !p.hidden; };
+  if (c === 'close') return npOpen(false);
+  if (c === 'pc') return pop('nppc');
+  if (c === 'pm') return pop('nppm');
+  if (c === 'copy') { const t = ed.innerText.trim(); if (!t) return toast('Noch nichts notiert.'); navigator.clipboard.writeText(t).then(() => toast('Notizen kopiert.'), () => toast('Kopieren hat nicht geklappt.')); return; }
+  if (c === 'clear') { if (ed.innerText.trim() && !confirm('Alle Notizen zu dieser Klassenarbeit löschen?')) return; ed.focus(); document.execCommand('selectAll'); document.execCommand('delete'); npChanged(); return; }
+  if (c === 'fs-' || c === 'fs+') { const cur = parseFloat(getComputedStyle(ed).fontSize) || 14.5, n = Math.max(12, Math.min(22, cur + (c === 'fs+' ? 1.5 : -1.5))); ed.style.setProperty('--npfs', n + 'px'); try { localStorage.setItem(NP_FS, String(n)); } catch(e) {} return; }
+  if (!ed.contains(document.getSelection().anchorNode)) ed.focus();
+  document.execCommand('styleWithCSS', false, c === 'fc' || c === 'mk');   // Farben als <span style>, sonst echte Tags (<b>, <i> …)
+  if (c === 'fc' || c === 'mk') {
+    document.execCommand(c === 'fc' ? 'foreColor' : 'hiliteColor', false, v);
+    ed.querySelectorAll('[style],font[color]').forEach(x => {   // „Standard“/„Keine“: Platzhalterfarbe wieder entfernen
+      if (x.style.color === 'rgb(1, 2, 3)') x.style.removeProperty('color');
+      if (x.style.backgroundColor === 'rgb(1, 2, 3)') x.style.removeProperty('background-color');
+      if (x.getAttribute('color') === '#010203') x.removeAttribute('color');
+      if (!x.getAttribute('style')) x.removeAttribute('style');
+      if ((x.tagName === 'SPAN' || x.tagName === 'FONT') && !x.attributes.length) x.replaceWith(...x.childNodes);
+    });
+    if (c === 'fc' && v !== '#010203') document.querySelector('.np-b.c').style.setProperty('--np-c', v);
+    document.querySelectorAll('.np-pop').forEach(p => p.hidden = true);
+  }
+  else if (['p', 'h1', 'h2', 'pre'].includes(c)) document.execCommand('formatBlock', false, c === 'p' ? 'div' : c);
+  else if (c === 'code') {
+    const s = document.getSelection(), n = s.anchorNode, inCode = n && (n.nodeType === 1 ? n : n.parentElement).closest('code');
+    if (inCode && ed.contains(inCode)) { const r = document.createRange(); r.selectNode(inCode); s.removeAllRanges(); s.addRange(r); document.execCommand('insertText', false, inCode.textContent); }
+    else if (!s.isCollapsed) document.execCommand('insertHTML', false, '<code>' + esc(s.toString()) + '</code>&#8203;');
+  }
+  else document.execCommand(c);
+  npChanged(); npState();
+}
+function npState(){
+  const box = document.getElementById('notepad'); if (!box) return;
+  ['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList', 'superscript', 'subscript'].forEach(c => {
+    const b = box.querySelector(`[data-np="${c}"]`); let on = false; try { on = document.queryCommandState(c); } catch(e) {} if (b) b.setAttribute('aria-pressed', String(on));
+  });
+  let blk = ''; try { blk = String(document.queryCommandValue('formatBlock') || '').toLowerCase(); } catch(e) {}
+  ['h1', 'h2', 'pre'].forEach(c => { const b = box.querySelector(`[data-np="${c}"]`); if (b) b.setAttribute('aria-pressed', String(blk === c)); });
+}
+function npChanged(){
+  const ed = document.getElementById('nped'); if (!ed || !np.ka) return;
+  if (ed.innerHTML === '<br>' || ed.innerHTML === '<div><br></div>') ed.innerHTML = '';
+  const n = ed.innerText.replace(/\s+$/, '').length;
+  document.getElementById('npcnt').textContent = n + ' Zeichen';
+  document.getElementById('npst').textContent = 'Speichert …';
+  clearTimeout(np.t); const kid = np.ka;
+  np.t = setTimeout(() => {
+    const all = npStore(); if (ed.innerHTML) all[kid] = ed.innerHTML; else delete all[kid];
+    try { localStorage.setItem(NP_KEY, JSON.stringify(all)); document.getElementById('npst').textContent = 'Gespeichert'; }
+    catch(e) { document.getElementById('npst').textContent = 'Speicher voll, nicht gespeichert'; }
+  }, 400);
+}
+function npLoad(kid){
+  const ed = document.getElementById('nped'); if (!ed) return;
+  if (np.ka && np.t) { clearTimeout(np.t); const all = npStore(); if (ed.innerHTML) all[np.ka] = ed.innerHTML; else delete all[np.ka]; try { localStorage.setItem(NP_KEY, JSON.stringify(all)); } catch(e) {} }
+  np.ka = kid; ed.innerHTML = npClean(npStore()[kid] || '');
+  const a = ka(kid); document.getElementById('npka').textContent = a ? a.title : '';
+  document.getElementById('npcnt').textContent = ed.innerText.replace(/\s+$/, '').length + ' Zeichen';
+  document.getElementById('npst').textContent = '';
+}
+function npOpen(on){
+  try { localStorage.setItem(NP_OPEN, on ? '1' : '0'); } catch(e) {}
+  document.body.classList.toggle('np-open', on);
+  if (on) { const ed = document.getElementById('nped'); if (ed) setTimeout(() => ed.focus(), 50); } else document.getElementById('nptab').focus();
+}
+function npSync(){
+  npInit();
+  const on = ui.view === 'quiz' && !!ka(ui.ka);
+  document.body.classList.toggle('np-quiz', on);
+  let open = true; try { open = localStorage.getItem(NP_OPEN) !== '0'; } catch(e) {}
+  document.body.classList.toggle('np-open', open);
+  if (on && np.ka !== ui.ka) npLoad(ui.ka);
+}
+
 /* ---------- Lern-Chat zum Thema ---------- */
 /* KI-Text: `code` als Code anzeigen, sonst nur Text */
 function kiText(s){ return esc(s).replace(/`([^`\n]{1,120})`/g, '<code>$1</code>'); }
@@ -3721,6 +3900,7 @@ function render(){
   try { classRefresh(); } catch(e) {}
   try { if (boardVisible()) boardStart(); else boardStop(); } catch(e) {}
   if (ui.view !== 'chat' && chat.unsub) chatStop();
+  try { npSync(); } catch(e) {}
   saveUi();
 }
 function renderSync(){
