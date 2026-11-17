@@ -3634,21 +3634,43 @@ function npCmd(c, v, el){
     if (c === 'fc' && v !== '#010203') document.querySelector('.np-b.c').style.setProperty('--np-c', v);
     document.querySelectorAll('.np-pop').forEach(p => p.hidden = true);
   }
-  else if (['p', 'h1', 'h2', 'pre'].includes(c)) document.execCommand('formatBlock', false, c === 'p' ? 'div' : c);
+  else if (['p', 'h1', 'h2', 'pre'].includes(c)) document.execCommand('formatBlock', false, c === 'p' || npBlock() === c ? 'div' : c);   // H1/H2/Codeblock: nochmal klicken = zurück zu Text
   else if (c === 'code') {
-    const s = document.getSelection(), n = s.anchorNode, inCode = n && (n.nodeType === 1 ? n : n.parentElement).closest('code');
-    if (inCode && ed.contains(inCode)) { const r = document.createRange(); r.selectNode(inCode); s.removeAllRanges(); s.addRange(r); document.execCommand('insertText', false, inCode.textContent); }
-    else if (!s.isCollapsed) document.execCommand('insertHTML', false, '<code>' + esc(s.toString()) + '</code>&#8203;');
+    const s = document.getSelection(), hit = npCodes(ed);
+    if (hit.length) npUncode(ed, hit);                                   // schon Code: zurück zu normalem Text
+    else if (!s.isCollapsed) document.execCommand('insertHTML', false, '<code>' + esc(s.toString().replace(/\u200B/g, '')) + '</code>&#8203;');
+  }
+  else if (c === 'removeFormat') {                                       // Tx: auch Code und Überschriften/Codeblock zurücksetzen
+    document.execCommand('removeFormat'); const hit = npCodes(ed); if (hit.length) npUncode(ed, hit);
+    if (['h1', 'h2', 'pre'].includes(npBlock())) document.execCommand('formatBlock', false, 'div');
   }
   else document.execCommand(c);
   npChanged(); npState();
+}
+function npBlock(){ try { return String(document.queryCommandValue('formatBlock') || '').toLowerCase(); } catch(e) { return ''; } }
+/* <code>-Stellen, die in der Auswahl liegen oder in denen der Cursor steht */
+function npCodes(ed){
+  const s = document.getSelection(); if (!s.rangeCount) return [];
+  const r = s.getRangeAt(0), n = s.anchorNode, el = n && (n.nodeType === 1 ? n : n.parentElement);
+  const hit = [...ed.querySelectorAll('code')].filter(c => r.intersectsNode(c));
+  const inC = el && el.closest('code'); if (inC && ed.contains(inC) && !hit.includes(inC)) hit.push(inC);
+  return hit;
+}
+function npUncode(ed, list){
+  const moved = [];
+  list.forEach(c => { moved.push(...c.childNodes); c.replaceWith(...c.childNodes); });
+  const w = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT); let t; while ((t = w.nextNode())) if (t.data.includes('\u200B')) t.data = t.data.replace(/\u200B/g, '');
+  ed.normalize();
+  const live = moved.filter(x => ed.contains(x));
+  if (live.length) { const r = document.createRange(); r.setStartBefore(live[0]); r.setEndAfter(live[live.length - 1]); const s = document.getSelection(); s.removeAllRanges(); s.addRange(r); }
 }
 function npState(){
   const box = document.getElementById('notepad'); if (!box) return;
   ['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList', 'superscript', 'subscript'].forEach(c => {
     const b = box.querySelector(`[data-np="${c}"]`); let on = false; try { on = document.queryCommandState(c); } catch(e) {} if (b) b.setAttribute('aria-pressed', String(on));
   });
-  let blk = ''; try { blk = String(document.queryCommandValue('formatBlock') || '').toLowerCase(); } catch(e) {}
+  const blk = npBlock(), ed = document.getElementById('nped'), cb = box.querySelector('[data-np="code"]');
+  if (cb && ed) cb.setAttribute('aria-pressed', String(ed.contains(document.getSelection().anchorNode) && npCodes(ed).length > 0));
   ['h1', 'h2', 'pre'].forEach(c => { const b = box.querySelector(`[data-np="${c}"]`); if (b) b.setAttribute('aria-pressed', String(blk === c)); });
 }
 function npChanged(){
@@ -5203,7 +5225,7 @@ const UPDATES = [
 (function(){
   const el = document.getElementById('updside'); if (!el || !UPDATES.length) return;
   const day = s => new Date(s + 'T00:00').getTime(), fmt = s => s.split('-').reverse().join('.');
-  el.innerHTML = '<p class="ts-title">Updates</p><ul class="upd-list">' + UPDATES.slice(0, 10).map(u =>
+  el.innerHTML = '<p class="ts-title">Updates</p><ul class="upd-list">' + UPDATES.filter(u => u.d === UPDATES.reduce((m, x) => x.d > m ? x.d : m, '')).map(u =>
     `<li><span class="upd-date">${fmt(u.d)}${Date.now() - day(u.d) < 3 * 864e5 ? '<b class="upd-new">Neu</b>' : ''}</span><p>${esc(u.t)}</p></li>`).join('') + '</ul>';
 })();
 })();
