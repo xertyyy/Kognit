@@ -2140,10 +2140,10 @@ async function fbStart(){
     try { await fb.auth.getRedirectResult(); } catch(e) { fb.err = fbErr(e); }
     fb.auth.onAuthStateChanged(async u => {
       fb.user = u || null; gate.loading = false;
-      if (u) { guestMode = false; await fbSync(local.get('fbuid') !== u.uid); hideGate(); if (ui.view === 'login') go('settings'); afterLogin(); }
-      else { db = null; base = null; syncState = 'local'; if (!guestMode) paintGate(); if (ui.view === 'list' || ui.view === 'login') render(); else renderSync(); }
+      if (u) { guestMode = false; const same = local.get('fbuid') === u.uid; if (same) hideGate(); await fbSync(!same); hideGate(); if (ui.view === 'login') go('settings'); afterLogin(); }
+      else { db = null; base = null; syncState = 'local'; if (!guestMode) gateUp(); if (ui.view === 'list' || ui.view === 'login') render(); else renderSync(); }
     });
-  } catch(e) { fb.failed = true; gate.loading = false; paintGate(); }
+  } catch(e) { fb.failed = true; gate.loading = false; gateUp(); }
   if (ui.view === 'login') render();
 }
 function fbErr(e){
@@ -3043,11 +3043,13 @@ function paintGate(){
     <p class="gate-note">Mit Konto werden deine E-Mail-Adresse und dein Lernstand bei Google Firebase gespeichert. Deine E-Mail-Adresse sieht niemand. Bist du in einer Klasse, sieht sie deinen Vornamen und dein Bereit-%.</p>
   </div></div>`;
 }
+/* Anmeldefenster zeigen oder aktualisieren (es kann fehlen, wenn man zuletzt angemeldet war) */
+function gateUp(){ if (gate.el) paintGate(); else showGate(); }
 function hideGate(){ if (!gate.el) return; gate.el.remove(); gate.el = null; document.documentElement.classList.remove('gated'); }
 function enterGuest(){ let seen = false; try { seen = localStorage.getItem(TOUR_KEY) === '1'; } catch(e) {} guestMode = true; hideGate(); renderSync(); if (seen) toast('Gastmodus: Es wird nichts gespeichert.'); else maybeTour(); }
 
 async function connect(){
-  if (!window.claude || !window.claude.use) { syncState = 'local'; ui.sample = null; render(); showGate(); fbStart(); return; }
+  if (!window.claude || !window.claude.use) { syncState = 'local'; ui.sample = null; render(); if (!local.get('fbuid')) showGate(); fbStart(); return; }   // War man zuletzt angemeldet, kein Anmeldefenster beim Neuladen zeigen
   try {
     const [d, u] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
     const id = u ? await u.id() : null;
