@@ -1156,14 +1156,16 @@ main .btn,main .chip,main .navbtn,main .themebtn{-webkit-backdrop-filter:saturat
 .np-head{display:flex;align-items:center;gap:8px;margin:0 4px 8px}
 .np-head b{font-size:15px}
 .np-head span{flex:1;min-width:0;font-size:12.5px;color:var(--label2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.np-bar{display:flex;flex-wrap:wrap;gap:2px;padding:4px;border-radius:12px;background:var(--fill);position:relative}
-.np-bar i{width:1px;align-self:stretch;margin:4px 3px;background:var(--glass-edge,rgba(128,128,128,.3))}
+.np-bar{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:2px;padding:4px;border-radius:12px;background:var(--fill);position:relative}
+.np-bar i{grid-column:1 / -1;height:1px;margin:3px 6px;background:var(--glass-edge,rgba(128,128,128,.3))}
+.np-bar .np-b{width:100%;min-width:0}
+.np-head .np-b{color:var(--label2)}
 .np-b{min-width:30px;height:30px;padding:0 6px;border:0;border-radius:8px;background:none;color:var(--label);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;display:inline-grid;place-items:center;line-height:1}
 .np-b:hover{background:var(--fill)}
 .np-b[aria-pressed="true"]{background:rgba(var(--fach-rgb),.2);color:var(--fach)}
 .np-b svg{width:17px;height:17px}
 .np-b.c{position:relative}
-.np-b.c u{position:absolute;left:7px;right:7px;bottom:4px;height:3px;border-radius:2px;background:var(--np-c,currentColor)}
+.np-b.c u{position:absolute;left:50%;width:16px;transform:translateX(-50%);bottom:4px;height:3px;border-radius:2px;background:var(--np-c,currentColor)}
 .np-pop{position:absolute;z-index:2;top:calc(100% + 6px);display:flex;flex-wrap:wrap;gap:6px;width:164px;padding:8px;border-radius:12px;background:var(--bg2,var(--glass));border:1px solid var(--glass-edge);box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .np-pop[hidden]{display:none}
 .np-sw{width:26px;height:26px;border-radius:50%;border:1px solid rgba(128,128,128,.4);cursor:pointer;padding:0;font-size:13px;color:var(--label)}
@@ -3581,15 +3583,13 @@ function npInit(){
   const box = document.getElementById('notepad'); if (!box || np.init) return; np.init = true;
   const b = (cmd, label, title, extra = '') => `<button class="np-b${extra}" type="button" data-np="${cmd}" title="${title}" aria-label="${title}">${label}</button>`;
   const sw = (list, kind) => list.map(([n, c]) => `<button class="np-sw" type="button" data-np="${kind}" data-v="${c}" title="${n}" aria-label="${n}" style="background:${c === '#010203' ? 'transparent' : c}">${c === '#010203' ? '∅' : ''}</button>`).join('');
-  box.innerHTML = `<div class="np-head"><b>Notizen</b><span id="npka"></span><button class="np-b" type="button" data-np="close" title="Notizblock einklappen" aria-label="Notizblock einklappen">${NP_IC.hide}</button></div>
+  box.innerHTML = `<div class="np-head"><b>Notizen</b><span id="npka"></span><button class="np-b" type="button" data-np="clear" title="Notizen leeren" aria-label="Notizen leeren">${NP_IC.del}</button><button class="np-b" type="button" data-np="close" title="Notizblock einklappen" aria-label="Notizblock einklappen">${NP_IC.hide}</button></div>
     <div class="np-bar" role="toolbar" aria-label="Formatierung">
-      ${b('undo', NP_IC.undo, 'Rückgängig (Strg+Z)')}${b('redo', NP_IC.redo, 'Wiederholen (Strg+Y)')}<i></i>
-      ${b('p', 'T', 'Normaler Text')}${b('h1', 'H1', 'Große Überschrift')}${b('h2', 'H2', 'Kleine Überschrift')}${b('pre', NP_IC.pre, 'Codeblock')}<i></i>
-      ${b('bold', '<b>B</b>', 'Fett (Strg+B)')}${b('italic', '<span style="font-style:italic;font-family:Georgia,serif;font-size:16px;font-weight:700">I</span>', 'Kursiv (Strg+I)')}${b('underline', '<u>U</u>', 'Unterstrichen (Strg+U)')}${b('strikeThrough', '<s>S</s>', 'Durchgestrichen')}${b('code', '<span style="font-family:ui-monospace,Menlo,monospace;font-size:12px">&lt;/&gt;</span>', 'Code im Text (Strg+E)')}<i></i>
-      ${b('pc', 'A<u></u>', 'Textfarbe', ' c')}${b('pm', '<span style="padding:0 3px;border-radius:3px;background:rgba(255,214,10,.45)">ab</span>', 'Markieren')}<i></i>
-      ${b('insertUnorderedList', NP_IC.ul, 'Aufzählung')}${b('insertOrderedList', NP_IC.ol, 'Nummerierte Liste')}${b('outdent', NP_IC.out, 'Einzug verkleinern (Umschalt+Tab)')}${b('indent', NP_IC.ind, 'Einzug vergrößern (Tab)')}<i></i>
-      ${b('superscript', 'x²', 'Hochgestellt, z. B. 2^64')}${b('subscript', 'x₂', 'Tiefgestellt, z. B. 1010₂')}${b('insertHorizontalRule', NP_IC.hr, 'Trennlinie')}${b('removeFormat', NP_IC.clr, 'Formatierung entfernen')}<i></i>
-      ${b('fs-', 'A−', 'Schrift kleiner')}${b('fs+', 'A+', 'Schrift größer')}${b('copy', NP_IC.copy, 'Alles als Text kopieren')}${b('clear', NP_IC.del, 'Notizen leeren')}
+      ${b('bold', '<b>B</b>', 'Fett (Strg+B)')}${b('italic', '<span style="font-style:italic;font-family:Georgia,serif;font-size:16px;font-weight:700">I</span>', 'Kursiv (Strg+I)')}${b('underline', '<u>U</u>', 'Unterstrichen (Strg+U)')}${b('strikeThrough', '<s>S</s>', 'Durchgestrichen')}${b('code', '<span style="font-family:ui-monospace,Menlo,monospace;font-size:12px">&lt;/&gt;</span>', 'Code im Text (Strg+E)')}${b('superscript', 'x²', 'Hochgestellt, z. B. 2^64')}${b('subscript', 'x₂', 'Tiefgestellt, z. B. 1010₂')}${b('removeFormat', NP_IC.clr, 'Formatierung entfernen')}
+      <i></i>
+      ${b('p', 'T', 'Normaler Text')}${b('h1', 'H1', 'Große Überschrift')}${b('h2', 'H2', 'Kleine Überschrift')}${b('pre', NP_IC.pre, 'Codeblock')}${b('insertUnorderedList', NP_IC.ul, 'Aufzählung')}${b('insertOrderedList', NP_IC.ol, 'Nummerierte Liste')}${b('outdent', NP_IC.out, 'Einzug verkleinern (Umschalt+Tab)')}${b('indent', NP_IC.ind, 'Einzug vergrößern (Tab)')}
+      <i></i>
+      ${b('undo', NP_IC.undo, 'Rückgängig (Strg+Z)')}${b('redo', NP_IC.redo, 'Wiederholen (Strg+Y)')}${b('pc', 'A<u></u>', 'Textfarbe', ' c')}${b('pm', '<span style="padding:0 3px;border-radius:3px;background:rgba(255,214,10,.45)">ab</span>', 'Markieren')}${b('insertHorizontalRule', NP_IC.hr, 'Trennlinie')}${b('fs-', 'A−', 'Schrift kleiner')}${b('fs+', 'A+', 'Schrift größer')}${b('copy', NP_IC.copy, 'Alles als Text kopieren')}
       <div class="np-pop" id="nppc" hidden>${sw(NP_COLORS, 'fc')}</div><div class="np-pop" id="nppm" hidden>${sw(NP_MARKS, 'mk')}</div>
     </div>
     <div class="np-ed" id="nped" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Notizen" data-ph="Präfixe, Zwischenergebnisse, Merksätze … Wird automatisch gespeichert."></div>
